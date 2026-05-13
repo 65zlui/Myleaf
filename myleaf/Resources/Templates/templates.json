@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "templates": [
+    { "id": "siggraph", "name": "SIGGRAPH", "subtitle": "ACM SIGGRAPH Conference", "category": "conference", "file": "conference/siggraph.tex" },
+    { "id": "aaai", "name": "AAAI", "subtitle": "AAAI Conference on Artificial Intelligence", "category": "conference", "file": "conference/aaai.tex" },
+    { "id": "chi", "name": "CHI", "subtitle": "ACM CHI Conference on Human Factors", "category": "conference", "file": "conference/chi.tex" },
+    { "id": "neurips", "name": "NeurIPS", "subtitle": "Conference on Neural Information Processing Systems", "category": "conference", "file": "conference/neurips.tex" },
+    { "id": "ubicomp", "name": "UbiComp", "subtitle": "ACM International Joint Conference on Pervasive and Ubiquitous Computing", "category": "conference", "file": "conference/ubicomp.tex" },
+    { "id": "mobisys", "name": "MobiSys", "subtitle": "ACM International Conference on Mobile Systems", "category": "conference", "file": "conference/mobisys.tex" },
+    { "id": "mobicom", "name": "MobiCom", "subtitle": "ACM International Conference on Mobile Computing and Networking", "category": "conference", "file": "conference/mobicom.tex" },
+    { "id": "ccf-conference", "name": "CCF Conference", "subtitle": "China Computer Federation Conference Format", "category": "conference", "file": "conference/ccf-conference.tex" },
+    { "id": "sci-journal", "name": "SCI Journal", "subtitle": "Generic SCI Journal Article", "category": "journal", "file": "journal/sci-journal.tex" },
+    { "id": "ei-journal", "name": "EI Journal", "subtitle": "Engineering Index Journal Article", "category": "journal", "file": "journal/ei-journal.tex" },
+    { "id": "ieee-journal", "name": "IEEE Journal", "subtitle": "IEEE Transactions Journal Article", "category": "journal", "file": "journal/ieee-journal.tex" },
+    { "id": "science-bachelor", "name": "Science B.S. Thesis", "subtitle": "理科本科毕业论文", "category": "thesis", "file": "thesis/science-bachelor.tex" },
+    { "id": "science-master", "name": "Science M.S. Thesis", "subtitle": "理科硕士毕业论文", "category": "thesis", "file": "thesis/science-master.tex" },
+    { "id": "engineering-bachelor", "name": "Engineering B.Eng. Thesis", "subtitle": "工科本科毕业论文", "category": "thesis", "file": "thesis/engineering-bachelor.tex" },
+    { "id": "engineering-master", "name": "Engineering M.Eng. Thesis", "subtitle": "工科硕士毕业论文", "category": "thesis", "file": "thesis/engineering-master.tex" },
+    { "id": "arts-bachelor", "name": "Liberal Arts B.A. Thesis", "subtitle": "文科本科毕业论文", "category": "thesis", "file": "thesis/arts-bachelor.tex" },
+    { "id": "arts-master", "name": "Liberal Arts M.A. Thesis", "subtitle": "文科硕士毕业论文", "category": "thesis", "file": "thesis/arts-master.tex" },
+    { "id": "fine-arts-bachelor", "name": "Fine Arts B.F.A. Thesis", "subtitle": "艺术类本科毕业论文", "category": "thesis", "file": "thesis/fine-arts-bachelor.tex" },
+    { "id": "fine-arts-master", "name": "Fine Arts M.F.A. Thesis", "subtitle": "艺术类硕士毕业论文", "category": "thesis", "file": "thesis/fine-arts-master.tex" }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "configurations" : [
+    {
+      "id" : "B0C7C91B-7678-44D6-81E4-9C316B698456",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:myleaf.xcodeproj",
+      "identifier" : "786B867C2F9965E800028186",
+      "name" : "myleaf"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:myleaf.xcodeproj",
+        "identifier" : "786B868A2F9965E900028186",
+        "name" : "myleafTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:myleaf.xcodeproj",
+        "identifier" : "786B86942F9965E900028186",
+        "name" : "myleafUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

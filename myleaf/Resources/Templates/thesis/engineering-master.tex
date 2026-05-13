@@ -1,0 +1,277 @@
+\documentclass[a4paper,12pt,openright]{ctexrep}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{caption}
+
+\onehalfspacing
+
+% ===== 封面信息（中英文） =====
+\newcommand{\thesistitle}{面向XXX场景的YYY关键技术研究}
+\newcommand{\thesistitleEN}{English Title of Your Thesis}
+\newcommand{\thesisauthor}{您的姓名}
+\newcommand{\thesisauthorEN}{Your Name}
+\newcommand{\studentid}{学号}
+\newcommand{\department}{工学学院}
+\newcommand{\departmentEN}{School of Engineering}
+\newcommand{\major}{工学专业}
+\newcommand{\majorEN}{Engineering}
+\newcommand{\supervisor}{导师姓名\ 教授}
+\newcommand{\supervisorEN}{Prof. Supervisor Name}
+
+\begin{document}
+
+% ============================================================
+%   中文封面
+% ============================================================
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\Large \textbf{XX大学}}\\[0.5cm]
+{\huge \textbf{硕士学位论文}}\\[2cm]
+{\LARGE \textbf{\thesistitle}}\\[3cm]
+
+\begin{tabular}{rl}
+\textbf{学\hspace{2em}院：} & \department \\[8pt]
+\textbf{专\hspace{2em}业：} & \major \\[8pt]
+\textbf{姓\hspace{2em}名：} & \thesisauthor \\[8pt]
+\textbf{学\hspace{2em}号：} & \studentid \\[8pt]
+\textbf{指导教师：} & \supervisor \\[8pt]
+\end{tabular}
+
+\vfill
+{\large \today}
+\end{titlepage}
+
+% ============================================================
+%   English Cover Page
+% ============================================================
+\newpage
+\thispagestyle{empty}
+\centering
+\vspace*{2cm}
+
+{\Large \textbf{XX University}}\\[0.5cm]
+{\huge \textbf{Master's Thesis}}\\[0.3cm]
+{\large for the degree of Master of Engineering}\\[2cm]
+{\LARGE \textbf{\thesistitleEN}}\\[3cm]
+
+\begin{tabular}{rl}
+\textbf{School:} & \departmentEN \\[8pt]
+\textbf{Major:} & \majorEN \\[8pt]
+\textbf{Author:} & \thesisauthorEN \\[8pt]
+\textbf{Student ID:} & \studentid \\[8pt]
+\textbf{Supervisor:} & \supervisorEN \\[8pt]
+\end{tabular}
+
+\vfill
+{\large \today}
+
+\raggedright
+
+% ============================================================
+%   学术诚信声明
+% ============================================================
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\Large \textbf{学术诚信声明}}\\[0.3cm]
+{\large \textbf{Declaration of Academic Integrity}}
+\end{center}
+\vspace{0.5cm}
+
+本人郑重声明：所呈交的论文是本人在导师指导下独立进行研究工作所取得的成果。除文中已经注明引用的内容外，本论文不包含任何其他个人或集体已经发表或撰写过的作品成果。
+
+\vspace{0.5cm}
+I hereby declare that this thesis is the result of my own independent research under the guidance of my supervisor. Except for the content that has been cited, this thesis does not contain any work that has been published or written by any other individual or group.
+
+\vspace{2cm}
+\begin{flushright}
+签名 / Signature：\underline{\hspace{5cm}}\\[12pt]
+日期 / Date：\underline{\hspace{5cm}}
+\end{flushright}
+
+% ============================================================
+%   中文摘要
+% ============================================================
+\newpage
+\begin{center}
+{\Large \textbf{摘\quad 要}}
+\end{center}
+\vspace{0.5cm}
+
+在此填写中文摘要。摘要应概括论文的主要内容，包括研究目的、研究方法、主要成果和结论。硕士论文中文摘要一般500-1000字。
+
+\vspace{1cm}
+\noindent\textbf{关键词：} 关键词一；关键词二；关键词三；关键词四；关键词五
+
+% ============================================================
+%   English Abstract
+% ============================================================
+\newpage
+\begin{center}
+{\Large \textbf{Abstract}}
+\end{center}
+\vspace{0.5cm}
+
+Write your English abstract here. The abstract should summarize the main content of the thesis, including the research purpose, methodology, key findings, and conclusions. Typically 500-1000 words for a master's thesis.
+
+\vspace{1cm}
+\noindent\textbf{Keywords:} keyword one; keyword two; keyword three; keyword four; keyword five
+
+% ============================================================
+%   目录
+% ============================================================
+\newpage
+\tableofcontents
+
+% 如需图表目录，取消以下注释：
+% \listoffigures
+% \listoftables
+
+\newpage
+
+% ============================================================
+%   正文
+% ============================================================
+
+\chapter{绪论}
+\section{研究背景与意义}
+在此填写具体内容。
+
+\section{国内外研究现状综述}
+在此填写具体内容。
+
+\section{问题分析}
+在此填写具体内容。
+
+\section{研究内容与技术路线}
+在此填写具体内容。
+
+
+\chapter{相关理论与技术}
+\section{基础理论介绍}
+在此填写具体内容。
+
+\section{关键技术分析}
+在此填写具体内容。
+
+\section{现有方案优缺点评价}
+在此填写具体内容。
+
+
+\chapter{系统方案设计}
+\section{需求分析}
+在此填写具体内容。
+
+\section{总体架构设计}
+在此填写具体内容。
+
+\section{关键模块设计}
+在此填写具体内容。
+
+\section{技术方案论证}
+在此填写具体内容。
+
+
+\chapter{核心算法与实现}
+\section{算法原理与设计}
+在此填写具体内容。
+
+\section{算法复杂度分析}
+在此填写具体内容。
+
+\section{系统实现细节}
+在此填写具体内容。
+
+
+\chapter{实验与性能评估}
+\section{实验环境搭建}
+在此填写具体内容。
+
+\section{评估指标设计}
+在此填写具体内容。
+
+\section{实验结果分析}
+在此填写具体内容。
+
+\section{性能对比}
+在此填写具体内容。
+
+
+\chapter{结论与展望}
+\section{研究总结}
+在此填写具体内容。
+
+\section{主要创新点}
+在此填写具体内容。
+
+\section{研究局限性}
+在此填写具体内容。
+
+\section{未来改进方向}
+在此填写具体内容。
+
+
+
+% ============================================================
+%   参考文献
+% ============================================================
+\bibliographystyle{plain}
+\bibliography{references}
+
+% ============================================================
+%   致谢 / Acknowledgments
+% ============================================================
+\chapter*{致\quad 谢}
+\addcontentsline{toc}{chapter}{致谢}
+
+在此撰写中文致谢内容。感谢导师、同学、家人等对论文完成过程中的帮助与支持。
+
+\vspace{1cm}
+\begin{center}
+{\large \textbf{Acknowledgments}}
+\end{center}
+\vspace{0.3cm}
+
+Write your English acknowledgments here. Thank your supervisor, colleagues, family, and anyone who contributed to the completion of this thesis.
+
+% ============================================================
+%   附录 / Appendix
+% ============================================================
+\appendix
+\chapter{附录 / Appendix}
+如有需要，在此添加附录内容（如代码、补充数据、问卷等）。
+
+Add appendix content here if needed (e.g., code listings, supplementary data, questionnaires, etc.).
+
+% ============================================================
+%   个人简历与研究成果（硕士论文常见）
+% ============================================================
+
+\chapter*{个人简历与研究成果}
+\addcontentsline{toc}{chapter}{个人简历与研究成果}
+
+\noindent\textbf{个人简历 / Curriculum Vitae}
+
+\noindent XXX，X年X月出生于XX省XX市。X年X月至X年X月就读于XX大学XX专业，获工学学士学位。X年X月至今就读于XX大学XX专业，攻读工学硕士学位。
+
+\vspace{0.5cm}
+\noindent\textbf{研究成果 / Publications}
+
+\begin{enumerate}
+\item 作者1, 作者2. 论文标题[J]. 期刊名称, 年份, 卷(期): 页码.
+\item Author1, Author2. Paper Title[C]. Conference Name, Year.
+\end{enumerate}
+
+
+\end{document}
