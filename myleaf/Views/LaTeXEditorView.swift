@@ -24,6 +24,10 @@ struct LaTeXEditorView: NSViewRepresentable {
         textView.string = text
         textView.isRichText = false
         textView.allowsUndo = true
+        textView.typingAttributes = [
+            .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
+            .foregroundColor: NSColor.textColor
+        ]
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -102,7 +106,7 @@ struct LaTeXEditorView: NSViewRepresentable {
                 self?.applyHighlighting()
             }
             highlightWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
+            DispatchQueue.main.async(execute: workItem)
         }
 
         func applyHighlighting() {
@@ -117,15 +121,21 @@ struct LaTeXEditorView: NSViewRepresentable {
             let selectedRange = textView.selectedRange()
             let attributed = highlighter.highlightedString(from: source)
 
-            // Apply attributes incrementally to avoid textStorage replacement
+            // Only apply color attribute — avoid removing/re-adding font which
+            // would cause NSLayoutManager to recalculate all glyph metrics and
+            // trigger scroll view content size jumps.
             let storage = textView.textStorage!
             storage.beginEditing()
             storage.removeAttribute(.foregroundColor, range: NSRange(location: 0, length: storage.length))
-            storage.removeAttribute(.font, range: NSRange(location: 0, length: storage.length))
-            storage.addAttribute(.font, value: highlighter.font, range: NSRange(location: 0, length: storage.length))
             attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attrs, range, _ in
-                for (key, value) in attrs {
+                for (key, value) in attrs where key != .font {
                     storage.addAttribute(key, value: value, range: range)
+                }
+            }
+            // Font is applied separately to avoid redundant layout passes
+            attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attrs, range, _ in
+                if let fontValue = attrs[.font] {
+                    storage.addAttribute(.font, value: fontValue, range: range)
                 }
             }
             storage.endEditing()
