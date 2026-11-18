@@ -8,6 +8,13 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 
 ---
 
+## Screenshots
+
+| **Template Picker** | **Settings** |
+| ![Template Picker](screenshots/template-picker.png) | ![Settings](screenshots/settings.png) |
+
+---
+
 ## Features
 
 ### LaTeX Editor

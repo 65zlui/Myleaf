@@ -69,7 +69,6 @@ struct LaTeXEditorView: NSViewRepresentable {
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: LaTeXEditorView
         weak var textView: LaTeXTextView?
-        fileprivate var highlightWorkItem: DispatchWorkItem?
         private var isUpdatingProgrammatically = false
 
         init(_ parent: LaTeXEditorView) {
@@ -78,13 +77,14 @@ struct LaTeXEditorView: NSViewRepresentable {
 
         deinit {
             print("[Deinit] LaTeXEditorView.Coordinator")
-            highlightWorkItem?.cancel()
         }
 
         func textDidChange(_ notification: Notification) {
             guard !isUpdatingProgrammatically, let textView = textView else { return }
             parent.text = textView.string
-            scheduleHighlight()
+            // Apply highlighting synchronously to prevent a visible frame
+            // of un-highlighted text before the next run-loop tick.
+            applyHighlighting()
         }
 
         func updateTextWithoutResettingCursor(_ newText: String) {
@@ -100,15 +100,6 @@ struct LaTeXEditorView: NSViewRepresentable {
             applyHighlighting()
         }
 
-        func scheduleHighlight() {
-            highlightWorkItem?.cancel()
-            let workItem = DispatchWorkItem { [weak self] in
-                self?.applyHighlighting()
-            }
-            highlightWorkItem = workItem
-            DispatchQueue.main.async(execute: workItem)
-        }
-
         func applyHighlighting() {
             guard let textView = textView else { return }
             let source = textView.string
@@ -121,23 +112,33 @@ struct LaTeXEditorView: NSViewRepresentable {
             let selectedRange = textView.selectedRange()
             let attributed = highlighter.highlightedString(from: source)
 
-            // Only apply color attribute — avoid removing/re-adding font which
-            // would cause NSLayoutManager to recalculate all glyph metrics and
-            // trigger scroll view content size jumps.
             let storage = textView.textStorage!
+            let fullRange = NSRange(location: 0, length: storage.length)
+            let baseFont = NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)
+
             storage.beginEditing()
-            storage.removeAttribute(.foregroundColor, range: NSRange(location: 0, length: storage.length))
-            attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attrs, range, _ in
-                for (key, value) in attrs where key != .font {
-                    storage.addAttribute(key, value: value, range: range)
+
+            // 1. Reset foregroundColor only — never touch font globally, which
+            //    would cause NSLayoutManager to recalculate every glyph metric.
+            storage.removeAttribute(.foregroundColor, range: fullRange)
+
+            // 2. Apply foregroundColor from the highlighted attributed string.
+            attributed.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: attributed.length), options: []) { value, range, _ in
+                if let color = value {
+                    storage.addAttribute(.foregroundColor, value: color, range: range)
                 }
             }
-            // Font is applied separately to avoid redundant layout passes
-            attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attrs, range, _ in
-                if let fontValue = attrs[.font] {
-                    storage.addAttribute(.font, value: fontValue, range: range)
+
+            // 3. Apply font ONLY where it differs from the base monospaced font
+            //    (i.e. bold for \commands and \begin/\end). This avoids touching
+            //    the majority of ranges and prevents layout thrashing.
+            attributed.enumerateAttribute(.font, in: NSRange(location: 0, length: attributed.length), options: []) { value, range, _ in
+                guard let attrFont = value as? NSFont else { return }
+                if !attrFont.isEqual(baseFont) {
+                    storage.addAttribute(.font, value: attrFont, range: range)
                 }
             }
+
             storage.endEditing()
 
             textView.setSelectedRange(selectedRange)
@@ -150,15 +151,6 @@ struct LaTeXEditorView: NSViewRepresentable {
 class LaTeXTextView: NSTextView {
     deinit {
         print("[Deinit] LaTeXTextView")
-    }
-
-    override func paste(_ sender: Any?) {
-        super.paste(sender)
-        // Immediate highlighting after paste — skip 50ms debounce
-        if let coordinator = delegate as? LaTeXEditorView.Coordinator {
-            coordinator.highlightWorkItem?.cancel()
-            coordinator.applyHighlighting()
-        }
     }
 
     override var isAutomaticQuoteSubstitutionEnabled: Bool {

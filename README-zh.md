@@ -8,6 +8,16 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 ---
 
+## 截图预览
+
+| 编辑器 |
+|:------:|
+| ![编辑器](screenshots/editor.png) |
+| **模板选择** | **设置** |
+| ![模板选择](screenshots/template-picker.png) | ![设置](screenshots/settings.png) |
+
+---
+
 ## 功能特性
 
 ### 📝 LaTeX 编辑器
