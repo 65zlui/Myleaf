@@ -185,14 +185,21 @@ final class LaTeXCompiler {
 
         if let documentURL {
             let projectDir = documentURL.deletingLastPathComponent()
-            let sibling = projectDir.appendingPathComponent("myleaf-compile-\(UUID().uuidString.prefix(8)).tex")
-            do {
-                try source.write(to: sibling, atomically: true, encoding: .utf8)
-                compileFile = sibling
-                temporarySibling = sibling
-            } catch {
-                // Directory not writable (read-only volume, permissions, …):
-                // fall back to a self-contained temp compile below.
+
+            // If the buffer matches the file on disk, compile the real file
+            // directly — no temporary sibling is needed.
+            if let onDisk = try? String(contentsOf: documentURL, encoding: .utf8), onDisk == source {
+                compileFile = documentURL
+            } else {
+                let sibling = projectDir.appendingPathComponent("myleaf-compile-\(UUID().uuidString.prefix(8)).tex")
+                do {
+                    try source.write(to: sibling, atomically: true, encoding: .utf8)
+                    compileFile = sibling
+                    temporarySibling = sibling
+                } catch {
+                    // Directory not writable (read-only volume, permissions, …):
+                    // fall back to a self-contained temp compile below.
+                }
             }
         }
 

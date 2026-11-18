@@ -36,6 +36,7 @@ struct LaTeXEditorView: NSViewRepresentable {
             width: scrollView.contentSize.width,
             height: CGFloat.greatestFiniteMagnitude
         )
+        textView.textContainerInset = NSSize(width: 8, height: 10)
         textView.usesRuler = false
         textView.usesInspectorBar = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -50,12 +51,18 @@ struct LaTeXEditorView: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.parent = self
 
+        // Re-color tokens when the user switches between light and dark mode.
+        textView.appearanceDidChange = { [weak coordinator = context.coordinator] in
+            coordinator?.applyHighlighting()
+        }
+
         context.coordinator.applyHighlighting()
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? LaTeXTextView else { return }
+        context.coordinator.parent = self
         guard textView.string != text else { return }
         context.coordinator.updateTextWithoutResettingCursor(text)
     }
@@ -93,28 +100,36 @@ struct LaTeXEditorView: NSViewRepresentable {
             defer { isUpdatingProgrammatically = false }
 
             let selectedRange = textView.selectedRange()
+            let scrollOrigin = textView.enclosingScrollView?.contentView.bounds.origin
+
             textView.string = newText
+
             let clampedLocation = min(selectedRange.location, newText.utf16.count)
             let clampedLength = min(selectedRange.length, newText.utf16.count - clampedLocation)
             textView.setSelectedRange(NSRange(location: clampedLocation, length: clampedLength))
+
             applyHighlighting()
+
+            // Restore the scroll position after replacing the whole string.
+            if let scrollView = textView.enclosingScrollView, let origin = scrollOrigin {
+                textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+                scrollView.contentView.scroll(to: origin)
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
         }
 
         func applyHighlighting() {
             guard let textView = textView else { return }
             let source = textView.string
             let isDark = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let highlighter = LaTeXSyntaxHighlighter(
-                font: NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular),
-                isDark: isDark
-            )
+            let baseFont = NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)
+            let highlighter = LaTeXSyntaxHighlighter(font: baseFont, isDark: isDark)
 
             let selectedRange = textView.selectedRange()
             let attributed = highlighter.highlightedString(from: source)
 
             let storage = textView.textStorage!
             let fullRange = NSRange(location: 0, length: storage.length)
-            let baseFont = NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)
 
             storage.beginEditing()
 
@@ -141,6 +156,13 @@ struct LaTeXEditorView: NSViewRepresentable {
 
             storage.endEditing()
 
+            // Keep newly typed text in the neutral base style; it is recolored
+            // on the next keystroke anyway.
+            textView.typingAttributes = [
+                .font: baseFont,
+                .foregroundColor: LaTeXTokenType.text.color(isDark: isDark)
+            ]
+
             textView.setSelectedRange(selectedRange)
         }
     }
@@ -149,8 +171,16 @@ struct LaTeXEditorView: NSViewRepresentable {
 // MARK: - Custom NSTextView
 
 class LaTeXTextView: NSTextView {
+    /// Called when the effective appearance (light/dark) changes.
+    var appearanceDidChange: (() -> Void)?
+
     deinit {
         print("[Deinit] LaTeXTextView")
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        appearanceDidChange?()
     }
 
     override var isAutomaticQuoteSubstitutionEnabled: Bool {

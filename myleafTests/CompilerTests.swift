@@ -92,3 +92,34 @@ struct LaTeXCompilerTests {
         }
     }
 }
+
+/// Verifies the view-model wiring around compilation: engine detection,
+/// the isCompiling flag, error propagation, and the PDF preview document.
+@MainActor
+@Suite(.serialized)
+struct EditorViewModelCompileTests {
+
+    @Test func compileUpdatesPDFPreview() async throws {
+        guard LaTeXCompiler().detectEngine() != nil else { return }
+
+        let viewModel = EditorViewModel()
+        viewModel.newDocument()
+        viewModel.document.sourceText = """
+        \\documentclass{article}
+        \\begin{document}
+        View model integration test.
+        \\end{document}
+        """
+
+        viewModel.compile()
+
+        let deadline = Date().addingTimeInterval(180)
+        while viewModel.isCompiling && Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        #expect(viewModel.isCompiling == false)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.pdfDocument != nil)
+    }
+}

@@ -92,7 +92,7 @@ final class EditorViewModel {
         document = LaTeXDocument(sourceText: template.content)
         pdfDocument = nil
         errorMessage = nil
-        savedText = ""
+        savedText = document.sourceText
         showWelcome = false
     }
 
@@ -141,7 +141,7 @@ final class EditorViewModel {
     /// Load a file from URL (used by history auto-open and open panel)
     func loadFile(url: URL) {
         do {
-            let content = try String(contentsOf: url, encoding: .utf8)
+            let content = try Self.readText(from: url)
             document = LaTeXDocument(sourceText: content, fileURL: url)
             savedText = content
             pdfDocument = nil
@@ -205,6 +205,19 @@ final class EditorViewModel {
         } catch {
             errorMessage = "Failed to save file: \(error.localizedDescription)"
         }
+    }
+
+    /// Reads a .tex file as UTF-8 when possible and falls back to the
+    /// encoding detected by Foundation (older documents are often Latin-1).
+    private static func readText(from url: URL) throws -> String {
+        var detected: String.Encoding = .utf8
+        if let text = try? String(contentsOf: url, usedEncoding: &detected) {
+            return text
+        }
+        if let text = try? String(contentsOf: url, encoding: .utf8) {
+            return text
+        }
+        return try String(contentsOf: url, encoding: .isoLatin1)
     }
 
     // MARK: - Auto-Save
