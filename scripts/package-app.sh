@@ -63,6 +63,10 @@ rm -rf "$DMG" "$ZIP" "$APP_COPY"
 hdiutil create -volname "myleaf $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 ditto -c -k --keepParent "$APP" "$ZIP"
 cp -R "$APP" "$APP_COPY"
+# The repo may live in a FileProvider-synced folder (Desktop/Documents), which
+# can attach Finder metadata that makes codesign verification fail.
+xattr -cr "$APP_COPY"
+codesign --verify --deep --strict "$APP_COPY"
 
 (
     cd "$DIST_DIR"
