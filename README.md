@@ -28,8 +28,10 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 
 ### LaTeX Compilation
 - **Multi-engine support**: Tectonic (preferred) with automatic fallback to pdflatex
+- **Project-aware**: Compiles in the document's folder, so `\input`, `\includegraphics`, and `.bib` references resolve correctly
 - **Auto-detection**: Detects available engines on launch with status indicator
 - **One-click install**: In-app Tectonic download and installation from GitHub Releases
+- **Reliable process handling**: Logs are captured to files (no pipe deadlocks) and a 5-minute timeout stops runaway builds
 - **Shortcut**: Cmd+B to compile
 
 ### Template System
@@ -68,9 +70,11 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 
 ### Download
 
-Grab the latest `.app` bundle from the [Releases](https://github.com/65zlui/myleaf/releases) page and drag it into your Applications folder.
+Grab the latest `.dmg` (or `.zip`) from the [Releases](https://github.com/65zlui/myleaf/releases) page and drag **myleaf** into your Applications folder.
 
 > **First launch**: The app will automatically detect available LaTeX engines. If none are found, you can install Tectonic with one click in Settings (~25MB download).
+
+> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the first launch, right-click the app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/myleaf.app`.
 
 ### Build from Source
 
@@ -81,6 +85,14 @@ open myleaf.xcodeproj
 ```
 
 Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Archive for a release build.
+
+### Package a Release
+
+```bash
+./scripts/package-app.sh
+```
+
+Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes `dist/myleaf.app`, `dist/myleaf-1.0.dmg`, `dist/myleaf-1.0.zip`, and `SHA256SUMS.txt`.
 
 ---
 
@@ -121,7 +133,7 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 | Text Editor | NSTextView with regex syntax highlighting |
 | LaTeX Engine | Tectonic / pdfLaTeX |
 | Word Export | Pandoc (LaTeX to DOCX) |
-| Process Management | `Process` with pipe communication |
+| Process Management | `Process` with log-file redirection and timeouts |
 | Persistence | UserDefaults (project history) |
 | Debugging | `leaks` CLI memory analysis |
 
@@ -147,8 +159,9 @@ myleaf/
 │   ├── Services/               # Business logic services
 │   ├── Utils/                  # Utility classes
 │   └── Resources/Templates/    # 19 LaTeX templates
-├── myleafTests/                # Unit tests
+├── myleafTests/                # Unit + compilation integration tests
 ├── myleafUITests/              # UI tests
+├── scripts/                    # Release packaging script
 └── myleaf.xcodeproj            # Xcode project
 ```
 
@@ -160,11 +173,13 @@ myleaf/
 xcodebuild -scheme myleafTests -configuration Debug test
 ```
 
-43+ unit tests covering:
+The suite covers:
 - Template loading and categorization
 - BibTeX file parsing
 - Project history management
 - Document model validation
+- LaTeX compilation end-to-end (skipped automatically when no TeX engine is installed)
+- View-model compile state and PDF preview wiring
 
 ---
 

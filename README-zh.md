@@ -31,8 +31,10 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 ### 🔧 LaTeX 编译
 - **多引擎支持**：Tectonic（首选）→ pdflatex 自动降级
+- **项目感知编译**：在文档所在目录编译，`\input`、图片和 `.bib` 引用均可正确解析
 - **自动检测**：启动时自动检测可用引擎并显示状态指示
 - **一键安装**：应用内下载安装 Tectonic（从 GitHub Release 获取）
+- **可靠的进程处理**：日志写入文件（避免管道死锁），5 分钟超时自动终止
 - **快捷键**：⌘B 一键编译
 
 ### 📦 模板系统
@@ -71,9 +73,11 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 ### 下载
 
-从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版 `.app` 文件，拖入 Applications 文件夹即可。
+从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版 `.dmg`（或 `.zip`），将 **myleaf** 拖入 Applications 文件夹即可。
 
 > **首次启动**：应用会自动检测 LaTeX 引擎。如未安装，可在设置中一键安装 Tectonic（约 25MB）。
+
+> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止首次启动，请右键点击应用选择「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/myleaf.app`。
 
 ### 从源码构建
 
@@ -84,6 +88,14 @@ open myleaf.xcodeproj
 ```
 
 在 Xcode 中选择 `myleaf` scheme，按 ⌘R 运行，或选择 Product → Archive 构建发布版本。
+
+### 打包发布
+
+```bash
+./scripts/package-app.sh
+```
+
+构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成 `dist/myleaf.app`、`dist/myleaf-1.0.dmg`、`dist/myleaf-1.0.zip` 和 `SHA256SUMS.txt`。
 
 ---
 
@@ -124,7 +136,7 @@ open myleaf.xcodeproj
 | 编辑器 | NSTextView + 正则语法高亮 |
 | LaTeX 引擎 | Tectonic / pdfLaTeX |
 | Word 导出 | Pandoc (LaTeX → DOCX) |
-| 进程管理 | `Process` + 管道通信 |
+| 进程管理 | `Process` + 日志文件重定向与超时 |
 | 持久化 | UserDefaults (项目历史) |
 | 调试 | `leaks` CLI 内存检测 |
 
@@ -150,8 +162,9 @@ myleaf/
 │   ├── Services/               # 业务服务层
 │   ├── Utils/                  # 工具类
 │   └── Resources/Templates/    # 19 个 LaTeX 模板
-├── myleafTests/                # 单元测试
+├── myleafTests/                # 单元测试 + 编译集成测试
 ├── myleafUITests/              # UI 测试
+├── scripts/                    # 发布打包脚本
 └── myleaf.xcodeproj            # Xcode 项目
 ```
 
@@ -163,11 +176,13 @@ myleaf/
 xcodebuild -scheme myleafTests -configuration Debug test
 ```
 
-包含 43+ 个单元测试，覆盖：
+测试覆盖：
 - 模板加载与分类
 - BibTeX 解析
 - 项目历史管理
 - 文档模型验证
+- LaTeX 编译端到端流程（未安装 TeX 引擎时自动跳过）
+- ViewModel 编译状态与 PDF 预览联动
 
 ---
 
