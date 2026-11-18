@@ -18,7 +18,7 @@ struct TemplateTests {
     }
 
     @Test func templateFileAccess() {
-        let templatesDir = URL(fileURLWithPath: "/Users/zhangrui/Desktop/Project/macos/myleaf/myleaf/myleaf/Resources/Templates")
+        let templatesDir = TemplateManager().templatesDir
         let jsonURL = templatesDir.appendingPathComponent("templates.json")
         let dirExists = FileManager.default.fileExists(atPath: templatesDir.path)
         let jsonExists = FileManager.default.fileExists(atPath: jsonURL.path)

@@ -20,13 +20,13 @@ enum AntiDebug {
     private static func c_ptrace(_ request: Int32, _ pid: Int32, _ addr: UnsafeMutableRawPointer?, _ data: Int32) -> Int32
 
     private static func denyPtrace() {
-        // Prevent debugger attachment via ptrace
-        let PT_DENY_ATTACH: Int32 = 0
-        let result = c_ptrace(PT_DENY_ATTACH, 0, nil, 0)
-        if result == -1 {
-            // If ptrace fails, the process may already be traced
-            exit(1)
-        }
+        // Prevent debugger attachment via ptrace.
+        // On macOS PT_DENY_ATTACH is request number 31 (not 0, which is
+        // PT_TRACE_ME). A failure here is not fatal — hardened runtime or a
+        // restricted environment can reject the request; the sysctl check
+        // below still detects an already-attached debugger.
+        let PT_DENY_ATTACH: Int32 = 31
+        _ = c_ptrace(PT_DENY_ATTACH, 0, nil, 0)
     }
 
     // MARK: - sysctl debugger detection

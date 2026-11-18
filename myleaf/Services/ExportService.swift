@@ -69,6 +69,7 @@ final class ExportService {
 
     // MARK: - PDF Export
 
+    @MainActor
     func exportPDF(pdfDocument: PDFDocument?, suggestedName: String) throws {
         guard let pdf = pdfDocument, let data = pdf.dataRepresentation() else {
             throw ExportError.noPDF
@@ -89,6 +90,7 @@ final class ExportService {
 
     // MARK: - Word Export
 
+    @MainActor
     func exportWord(source: String, suggestedName: String) async throws {
         guard let pandoc = pandocPath else {
             throw ExportError.pandocNotFound
@@ -109,8 +111,10 @@ final class ExportService {
         try source.write(to: texFile, atomically: true, encoding: .utf8)
 
         let outPath = outputURL.path
+        let logURL = tempDir.appendingPathComponent("pandoc.log")
 
-        // Run pandoc
+        // Run pandoc. Output is redirected to a file rather than a Pipe so a
+        // verbose conversion can never fill the 64 KB pipe buffer and deadlock.
         let result: Result<Void, ExportError> = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
@@ -123,23 +127,41 @@ final class ExportService {
                 ]
                 process.currentDirectoryURL = tempDir
 
-                let stderrPipe = Pipe()
-                process.standardError = stderrPipe
-                process.standardOutput = Pipe()
+                FileManager.default.createFile(atPath: logURL.path, contents: nil)
+                guard let logHandle = try? FileHandle(forWritingTo: logURL) else {
+                    continuation.resume(returning: .failure(.conversionFailed("Failed to open Pandoc log file")))
+                    return
+                }
+                process.standardError = logHandle
+                process.standardOutput = logHandle
 
                 do {
                     try process.run()
-                    process.waitUntilExit()
-
-                    if process.terminationStatus == 0 {
-                        continuation.resume(returning: .success(()))
-                    } else {
-                        let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                        let log = String(data: data, encoding: .utf8) ?? "Unknown error"
-                        continuation.resume(returning: .failure(.conversionFailed(log)))
-                    }
                 } catch {
+                    try? logHandle.close()
                     continuation.resume(returning: .failure(.conversionFailed(error.localizedDescription)))
+                    return
+                }
+
+                let deadline = Date().addingTimeInterval(180)
+                while process.isRunning && Date() < deadline {
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+                if process.isRunning {
+                    process.terminate()
+                    Thread.sleep(forTimeInterval: 1)
+                    if process.isRunning {
+                        kill(process.processIdentifier, SIGKILL)
+                    }
+                }
+                process.waitUntilExit()
+                try? logHandle.close()
+
+                if process.terminationStatus == 0 {
+                    continuation.resume(returning: .success(()))
+                } else {
+                    let log = (try? String(contentsOf: logURL, encoding: .utf8)) ?? "Unknown error"
+                    continuation.resume(returning: .failure(.conversionFailed(log)))
                 }
             }
         }

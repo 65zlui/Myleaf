@@ -119,7 +119,6 @@ final class EditorViewModel {
         // Try to insert before \end{document}, otherwise append
         let endDocPattern = "\\end{document}"
         if let range = document.sourceText.range(of: endDocPattern) {
-            let insertionPoint = document.sourceText.distance(from: document.sourceText.startIndex, to: range.lowerBound)
             // Insert on a new line before \end{document}
             var newText = document.sourceText
             let prefix = newText[..<range.lowerBound]
@@ -222,7 +221,7 @@ final class EditorViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
                 guard !Task.isCancelled else { break }
-                await self?.performAutoSave()
+                self?.performAutoSave()
             }
         }
     }
@@ -292,21 +291,31 @@ final class EditorViewModel {
     func compile() {
         guard !isCompiling else { return }
 
-        if case .notFound = compilerStatus {
-            errorMessage = CompilationError.engineNotFound.errorDescription
-            return
-        }
-
         isCompiling = true
         errorMessage = nil
 
         Task { [weak self] in
             guard let self else { return }
-            let result = await self.compiler.compile(source: self.document.sourceText)
+
+            // Engine detection runs at launch; make sure it has finished (or
+            // retry) before giving up with "engine not found".
+            if self.compilerStatus == .checking {
+                await self.detectCompiler()
+            }
+            if case .notFound = self.compilerStatus {
+                self.errorMessage = CompilationError.engineNotFound.errorDescription
+                self.isCompiling = false
+                return
+            }
+
+            let result = await self.compiler.compile(
+                source: self.document.sourceText,
+                documentURL: self.document.fileURL
+            )
 
             switch result {
-            case .success(let pdfURL):
-                if let pdf = PDFDocument(url: pdfURL) {
+            case .success(let output):
+                if let pdf = PDFDocument(data: output.pdfData) {
                     self.pdfDocument = pdf
                 } else {
                     self.errorMessage = "Failed to load generated PDF."

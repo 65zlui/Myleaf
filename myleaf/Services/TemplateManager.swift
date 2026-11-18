@@ -28,8 +28,16 @@ final class TemplateManager {
     private(set) var allTemplates: [Template] = []
 
     internal init() {
-        let sourceURL = URL(fileURLWithPath: "/Users/zhangrui/Desktop/Project/macos/myleaf/myleaf/myleaf/Resources/Templates")
-        if FileManager.default.fileExists(atPath: sourceURL.path) {
+        // When running from source (unit tests or an Xcode build on the
+        // developer's machine) prefer the source directory so template edits
+        // are picked up without rebuilding. Otherwise (shipped .app) read the
+        // flattened copies in Contents/Resources.
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Services/
+            .deletingLastPathComponent()   // myleaf/
+            .appendingPathComponent("Resources/Templates", isDirectory: true)
+
+        if FileManager.default.fileExists(atPath: sourceURL.appendingPathComponent("templates.json").path) {
             isDevelopmentMode = true
             templatesBaseURL = sourceURL
         } else {

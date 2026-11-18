@@ -5,6 +5,7 @@ enum CompilationError: LocalizedError {
     case compilationFailed(log: String)
     case outputNotFound
     case processError(String)
+    case timedOut(seconds: Int)
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +17,8 @@ enum CompilationError: LocalizedError {
             return "Compilation succeeded but no PDF was generated."
         case .processError(let msg):
             return "Failed to run LaTeX engine: \(msg)"
+        case .timedOut(let seconds):
+            return "Compilation timed out after \(seconds) seconds. Check your network connection (Tectonic downloads packages on first use) and try again."
         }
     }
 }
@@ -45,10 +48,19 @@ enum CompilerStatus: Equatable {
     case notFound
 }
 
+/// The artifacts of a successful compilation. The PDF is kept in memory so
+/// temporary files can be removed as soon as compilation finishes.
+struct CompilationOutput {
+    let pdfData: Data
+    let log: String
+}
+
 final class LaTeXCompiler {
 
+    /// Seconds before a runaway compilation is terminated.
+    private let compilationTimeout: TimeInterval = 300
+
     private(set) var engine: TeXEngine?
-    private var previousTempDir: URL?
 
     /// App Support path where tectonic is installed
     private var installedTectonicPath: URL {
@@ -112,6 +124,7 @@ final class LaTeXCompiler {
             return e
         }
 
+        engine = nil
         return nil
     }
 
@@ -142,79 +155,192 @@ final class LaTeXCompiler {
 
     // MARK: - Compilation
 
-    func compile(source: String) async -> Result<URL, CompilationError> {
+    /// Compiles `source` and returns the resulting PDF data.
+    ///
+    /// If `documentURL` is provided, the document is written to a temporary
+    /// sibling file inside the document's own directory and compiled from
+    /// there. This makes relative references (`\input`, `\includegraphics`,
+    /// `\bibliography`) resolve exactly as they do when the user compiles the
+    /// file with a command-line tool. The temporary file is removed afterwards.
+    func compile(source: String, documentURL: URL? = nil) async -> Result<CompilationOutput, CompilationError> {
         guard let engine = engine else {
             return .failure(.engineNotFound)
         }
 
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("myleaf-\(UUID().uuidString)")
-        let texFile = tempDir.appendingPathComponent("document.tex")
-        let pdfFile = tempDir.appendingPathComponent("document.pdf")
+        let fm = FileManager.default
+        let workDir = fm.temporaryDirectory
+            .appendingPathComponent("myleaf-build-\(UUID().uuidString)")
+        let outDir = workDir.appendingPathComponent("output")
 
         do {
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-            try source.write(to: texFile, atomically: true, encoding: .utf8)
+            try fm.createDirectory(at: outDir, withIntermediateDirectories: true)
         } catch {
-            return .failure(.processError("Failed to write temp files: \(error.localizedDescription)"))
+            return .failure(.processError("Failed to create temp directory: \(error.localizedDescription)"))
         }
 
-        let currentEngine = engine
-        let result: Result<URL, CompilationError> = await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.currentDirectoryURL = tempDir
+        // Compile from the project directory when possible so that relative
+        // paths (images, \input files, .bib files) resolve correctly.
+        var compileFile: URL?
+        var temporarySibling: URL?
 
-                switch currentEngine {
-                case .tectonic(let url):
-                    process.executableURL = url
-                    process.arguments = ["document.tex"]
-                case .pdflatex(let url):
-                    process.executableURL = url
-                    process.arguments = [
-                        "-interaction=nonstopmode",
-                        "-halt-on-error",
-                        "-output-directory", tempDir.path,
-                        "document.tex"
-                    ]
-                }
-
-                let stdoutPipe = Pipe()
-                let stderrPipe = Pipe()
-                process.standardOutput = stdoutPipe
-                process.standardError = stderrPipe
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-
-                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    let log = String(data: stdoutData, encoding: .utf8) ?? ""
-                    let errLog = String(data: stderrData, encoding: .utf8) ?? ""
-
-                    if process.terminationStatus == 0 {
-                        if FileManager.default.fileExists(atPath: pdfFile.path) {
-                            continuation.resume(returning: .success(pdfFile))
-                        } else {
-                            continuation.resume(returning: .failure(.outputNotFound))
-                        }
-                    } else {
-                        let fullLog = [log, errLog].filter { !$0.isEmpty }.joined(separator: "\n")
-                        continuation.resume(returning: .failure(.compilationFailed(log: fullLog)))
-                    }
-                } catch {
-                    continuation.resume(returning: .failure(.processError(error.localizedDescription)))
-                }
+        if let documentURL {
+            let projectDir = documentURL.deletingLastPathComponent()
+            let sibling = projectDir.appendingPathComponent("myleaf-compile-\(UUID().uuidString.prefix(8)).tex")
+            do {
+                try source.write(to: sibling, atomically: true, encoding: .utf8)
+                compileFile = sibling
+                temporarySibling = sibling
+            } catch {
+                // Directory not writable (read-only volume, permissions, …):
+                // fall back to a self-contained temp compile below.
             }
         }
 
-        // Cleanup previous temp dir
-        if let prev = previousTempDir {
-            try? FileManager.default.removeItem(at: prev)
+        if compileFile == nil {
+            let texFile = workDir.appendingPathComponent("document.tex")
+            do {
+                try source.write(to: texFile, atomically: true, encoding: .utf8)
+                compileFile = texFile
+            } catch {
+                try? fm.removeItem(at: workDir)
+                return .failure(.processError("Failed to write temp files: \(error.localizedDescription)"))
+            }
         }
-        previousTempDir = tempDir
 
-        return result
+        defer {
+            if let temporarySibling {
+                try? fm.removeItem(at: temporarySibling)
+            }
+            try? fm.removeItem(at: workDir)
+        }
+
+        guard let inputFile = compileFile else {
+            return .failure(.processError("No input file"))
+        }
+
+        let workingDirectory = inputFile.deletingLastPathComponent()
+        let arguments: [String]
+        switch engine {
+        case .tectonic:
+            arguments = ["--outdir", outDir.path, "--keep-logs", inputFile.path]
+        case .pdflatex:
+            arguments = [
+                "-interaction=nonstopmode",
+                "-halt-on-error",
+                "-output-directory", outDir.path,
+                inputFile.path
+            ]
+        }
+
+        let outcome = await runProcess(
+            executable: URL(fileURLWithPath: engine.path),
+            arguments: arguments,
+            workingDirectory: workingDirectory,
+            logURL: workDir.appendingPathComponent("build.log")
+        )
+
+        switch outcome {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let exitCode):
+            let log = readLog(at: workDir.appendingPathComponent("build.log"))
+
+            guard exitCode == 0 else {
+                return .failure(.compilationFailed(log: log.isEmpty ? "LaTeX engine exited with status \(exitCode)." : log))
+            }
+
+            // Tectonic names the output after the input file; pdflatex does the same.
+            let pdfURL = outDir
+                .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
+                .appendingPathExtension("pdf")
+
+            guard let data = try? Data(contentsOf: pdfURL), !data.isEmpty else {
+                return .failure(.outputNotFound)
+            }
+
+            return .success(CompilationOutput(pdfData: data, log: log))
+        }
+    }
+
+    // MARK: - Process Execution
+
+    /// Runs a process with stdout/stderr redirected to a log file.
+    ///
+    /// Using files instead of pipes is deliberate: `waitUntilExit()` together
+    /// with `Pipe` can deadlock once the child writes more than the 64 KB pipe
+    /// buffer (very common with verbose LaTeX logs). File redirection has no
+    /// such limit.
+    private func runProcess(
+        executable: URL,
+        arguments: [String],
+        workingDirectory: URL,
+        logURL: URL
+    ) async -> Result<Int32, CompilationError> {
+        let timeout = compilationTimeout
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Result<Int32, CompilationError>, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let fm = FileManager.default
+                fm.createFile(atPath: logURL.path, contents: nil)
+
+                guard let logHandle = try? FileHandle(forWritingTo: logURL) else {
+                    continuation.resume(returning: .failure(.processError("Failed to open log file")))
+                    return
+                }
+
+                let process = Process()
+                process.executableURL = executable
+                process.arguments = arguments
+                process.currentDirectoryURL = workingDirectory
+                process.standardOutput = logHandle
+                process.standardError = logHandle
+
+                do {
+                    try process.run()
+                } catch {
+                    try? logHandle.close()
+                    continuation.resume(returning: .failure(.processError(error.localizedDescription)))
+                    return
+                }
+
+                let deadline = Date().addingTimeInterval(timeout)
+                var timedOut = false
+                while process.isRunning {
+                    if Date() > deadline {
+                        timedOut = true
+                        process.terminate()
+                        // Give the engine a moment to exit cleanly, then force kill.
+                        Thread.sleep(forTimeInterval: 1.0)
+                        if process.isRunning {
+                            kill(process.processIdentifier, SIGKILL)
+                        }
+                        break
+                    }
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+
+                process.waitUntilExit()
+                try? logHandle.close()
+
+                if timedOut {
+                    continuation.resume(returning: .failure(.timedOut(seconds: Int(timeout))))
+                } else {
+                    continuation.resume(returning: .success(process.terminationStatus))
+                }
+            }
+        }
+    }
+
+    private func readLog(at url: URL) -> String {
+        guard let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Keep the error panel responsive with enormous logs.
+        let limit = 200_000
+        if trimmed.count > limit {
+            return String(trimmed.suffix(limit))
+        }
+        return trimmed
     }
 }
