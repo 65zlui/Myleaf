@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Builds a universal, ad-hoc signed release of myleaf and packages it as an
-# .app, a DMG, and a ZIP under dist/.
+# Builds a universal, ad-hoc signed release of myleaf and packages it as a
+# DMG and a ZIP under dist/. Both contain the signed myleaf.app.
 #
 # The project lives inside a FileProvider-synced folder on some machines;
 # Finder metadata there breaks codesign, so the build runs in a temp dir and
@@ -57,16 +57,14 @@ ln -s /Applications "$STAGE/Applications"
 
 DMG="$DIST_DIR/myleaf-$VERSION.dmg"
 ZIP="$DIST_DIR/myleaf-$VERSION.zip"
-APP_COPY="$DIST_DIR/myleaf.app"
-rm -rf "$DMG" "$ZIP" "$APP_COPY"
+rm -rf "$DMG" "$ZIP" "$DIST_DIR/myleaf.app"
+# Drop artifacts from older versions so dist/ only contains the current build.
+find "$DIST_DIR" -maxdepth 1 -type f \
+    \( -name 'myleaf-*.dmg' -o -name 'myleaf-*.zip' \) \
+    ! -name "myleaf-$VERSION.dmg" ! -name "myleaf-$VERSION.zip" -delete
 
 hdiutil create -volname "myleaf $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 ditto -c -k --keepParent "$APP" "$ZIP"
-cp -R "$APP" "$APP_COPY"
-# The repo may live in a FileProvider-synced folder (Desktop/Documents), which
-# can attach Finder metadata that makes codesign verification fail.
-xattr -cr "$APP_COPY"
-codesign --verify --deep --strict "$APP_COPY"
 
 (
     cd "$DIST_DIR"

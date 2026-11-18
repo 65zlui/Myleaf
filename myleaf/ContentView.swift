@@ -45,6 +45,12 @@ struct ContentView: View {
                 viewModel.insertCitations(entries)
             })
         }
+        .sheet(isPresented: $viewModel.showBuildLog) {
+            BuildLogView(
+                log: viewModel.lastBuildLog ?? "",
+                logFile: viewModel.lastBuildLogFile
+            )
+        }
     }
 
     // MARK: - Editor Content
@@ -87,7 +93,7 @@ struct ContentView: View {
                     }
 
                     if viewModel.isCompiling {
-                        ProgressView("Compiling...")
+                        ProgressView(viewModel.compilationPhase.isEmpty ? "Compiling..." : viewModel.compilationPhase)
                             .padding()
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                     }
@@ -179,6 +185,13 @@ struct ContentView: View {
                     .controlSize(.small)
                 }
 
+                if viewModel.lastBuildLog != nil {
+                    Button("Show Log") {
+                        viewModel.showBuildLogPanel()
+                    }
+                    .buttonStyle(.borderless)
+                }
+
                 Button("Dismiss") {
                     viewModel.errorMessage = nil
                 }
@@ -204,6 +217,12 @@ struct ContentView: View {
             }
             .disabled(viewModel.isCompiling || viewModel.compilerStatus == .notFound)
             .help("Compile LaTeX (\u{2318}B)")
+
+            Button(action: { viewModel.showBuildLogPanel() }) {
+                Label("Build Log", systemImage: "doc.text.magnifyingglass")
+            }
+            .disabled(viewModel.lastBuildLog == nil)
+            .help("Show the last LaTeX build log")
 
             Menu {
                 Button(action: { viewModel.exportPDF() }) {

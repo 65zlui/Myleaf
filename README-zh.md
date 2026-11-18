@@ -35,6 +35,7 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 - **自动检测**：启动时自动检测可用引擎并显示状态指示
 - **一键安装**：应用内下载安装 Tectonic（从 GitHub Release 获取）
 - **可靠的进程处理**：日志写入文件（避免管道死锁），5 分钟超时自动终止
+- **编译日志**：每次编译都会记录引擎、命令、退出状态、耗时和完整输出到 `~/Library/Logs/myleaf`，可用 ⌘⇧L 在应用内查看
 - **快捷键**：⌘B 一键编译
 
 ### 📦 模板系统
@@ -95,7 +96,7 @@ open myleaf.xcodeproj
 ./scripts/package-app.sh
 ```
 
-构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成 `dist/myleaf.app`、`dist/myleaf-1.0.dmg`、`dist/myleaf-1.0.zip` 和 `SHA256SUMS.txt`。
+构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成 `dist/myleaf-1.1.dmg`、`dist/myleaf-1.1.zip` 和 `SHA256SUMS.txt`。两个压缩包内均包含已签名的 `myleaf.app`。
 
 ---
 
@@ -183,6 +184,9 @@ xcodebuild -scheme myleafTests -configuration Debug test
 - 文档模型验证
 - LaTeX 编译端到端流程（未安装 TeX 引擎时自动跳过）
 - ViewModel 编译状态与 PDF 预览联动
+- 编译日志持久化
+
+完整的「问题定位 → 代码修改 → 验证」过程见 [DEBUGGING.md](DEBUGGING.md)。
 
 ---
 

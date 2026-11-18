@@ -1,7 +1,7 @@
-# myleaf 1.0.0
+# myleaf 1.1.0
 
 A native macOS LaTeX editor for academic writing — now with a hardened,
-project-aware compilation pipeline and a proper app icon.
+project-aware compilation pipeline, full build logs, and a proper app icon.
 
 ## Highlights
 
@@ -14,6 +14,16 @@ project-aware compilation pipeline and a proper app icon.
 - PDFs are kept in memory, so temporary build folders are removed immediately.
 - Works with Tectonic (with in-app one-click install) or pdflatex.
 
+### Build logs
+- Every compilation is recorded with a timestamp, engine, input path, working
+  directory, exact command line, full engine output, exit status, and duration.
+- Logs are persisted to `~/Library/Logs/myleaf/build-*.log` (last 30 kept) and
+  can be viewed in-app via the toolbar, the error panel, or **Build → Show
+  Build Log** (⌘⇧L).
+- The log panel supports copy, reveal-in-Finder, and opening the logs folder.
+- Compilation progress now shows the current phase (detecting engine, running
+  engine, loading PDF), and phases are also written to the unified system log.
+
 ### Editor
 - Syntax highlighting now gives comments the final word, ignores escaped `%`,
   and colors `\begin`/`\end` and math delimiters correctly.
@@ -25,9 +35,9 @@ project-aware compilation pipeline and a proper app icon.
 ### App & packaging
 - New app icon (all macOS sizes).
 - Universal binary: Apple Silicon + Intel.
-- Minimum macOS raised/lowered to match the README: macOS 14.0 (Sonoma).
-- Reproducible release packaging: `scripts/package-app.sh` produces
-  `myleaf.app`, a DMG, a ZIP, and `SHA256SUMS.txt`.
+- Minimum supported macOS is now 14.0 (Sonoma), matching the README.
+- Reproducible release packaging: `scripts/package-app.sh` produces a DMG, a
+  ZIP, and `SHA256SUMS.txt`; both archives contain the signed `myleaf.app`.
 - Hardened Runtime; ad-hoc signed (no paid Developer ID).
 - Fixed the anti-debug `PT_DENY_ATTACH` constant.
 
@@ -37,11 +47,13 @@ project-aware compilation pipeline and a proper app icon.
 - Pandoc export no longer calls `NSSavePanel` from a background executor and
   cannot deadlock on stderr.
 - Removed the hardcoded developer-specific template path.
-- Added compiler and view-model integration tests.
+- Added compiler, build-log, and view-model integration tests.
+- Unit tests run serially by default to avoid concurrent Tectonic cache
+  contention.
 
 ## Installation
 
-1. Download `myleaf-1.0.dmg` (or `myleaf-1.0.zip`).
+1. Download `myleaf-1.1.dmg` (or `myleaf-1.1.zip`).
 2. Open the DMG and drag **myleaf** into **Applications**.
 3. First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
    or run:

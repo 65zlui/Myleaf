@@ -13,10 +13,28 @@ extension FocusedValues {
     }
 }
 
+// MARK: - App Delegate
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// myleaf restores the last project itself through ProjectHistoryManager.
+    /// Disable AppKit's automatic window restoration: otherwise an old
+    /// NSTextView buffer can reappear on launch out of sync with the view
+    /// model (observed as an "Untitled" window containing a previously used
+    /// template after the saved application state was restored).
+    func applicationShouldSaveSecureApplicationState(_ app: NSApplication) -> Bool {
+        false
+    }
+
+    func applicationShouldRestoreSecureApplicationState(_ app: NSApplication) -> Bool {
+        false
+    }
+}
+
 // MARK: - App
 
 @main
 struct myleafApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @FocusedValue(\.editorViewModel) var viewModel
 
     init() {
@@ -81,6 +99,12 @@ struct myleafApp: App {
                 }
                 .keyboardShortcut("b", modifiers: .command)
                 .disabled(viewModel?.isCompiling == true)
+
+                Button("Show Build Log") {
+                    viewModel?.showBuildLogPanel()
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+                .disabled(viewModel?.lastBuildLog == nil)
             }
 
             // myleaf menu > Settings

@@ -32,6 +32,7 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 - **Auto-detection**: Detects available engines on launch with status indicator
 - **One-click install**: In-app Tectonic download and installation from GitHub Releases
 - **Reliable process handling**: Logs are captured to files (no pipe deadlocks) and a 5-minute timeout stops runaway builds
+- **Build logs**: Every compile is recorded (engine, command, exit status, duration, full engine output) under `~/Library/Logs/myleaf`, viewable in-app with Cmd+Shift+L
 - **Shortcut**: Cmd+B to compile
 
 ### Template System
@@ -92,7 +93,7 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 ./scripts/package-app.sh
 ```
 
-Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes `dist/myleaf.app`, `dist/myleaf-1.0.dmg`, `dist/myleaf-1.0.zip`, and `SHA256SUMS.txt`.
+Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes `dist/myleaf-1.1.dmg`, `dist/myleaf-1.1.zip`, and `SHA256SUMS.txt`. Both archives contain the signed `myleaf.app`.
 
 ---
 
@@ -180,6 +181,9 @@ The suite covers:
 - Document model validation
 - LaTeX compilation end-to-end (skipped automatically when no TeX engine is installed)
 - View-model compile state and PDF preview wiring
+- Build-log persistence
+
+See [DEBUGGING.md](DEBUGGING.md) for the full record of how each bug was located, fixed, and verified.
 
 ---
 

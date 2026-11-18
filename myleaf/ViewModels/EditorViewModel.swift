@@ -1,6 +1,9 @@
 import SwiftUI
 import PDFKit
 import UniformTypeIdentifiers
+import OSLog
+
+private let compileLogger = Logger(subsystem: "com.65zlui.myleaf", category: "build")
 
 @Observable
 @MainActor
@@ -18,6 +21,13 @@ final class EditorViewModel {
     var isInstallingPandoc = false
     var pandocInstallProgress: Double = 0
     var pandocInstallStatus = ""
+
+    // Build log for the most recent compilation (success or failure).
+    var lastBuildLog: String?
+    var lastBuildLogFile: URL?
+    var lastCompilationDuration: TimeInterval?
+    var compilationPhase = ""
+    var showBuildLog = false
 
     let installer = TectonicInstaller()
     let exportService = ExportService()
@@ -306,38 +316,56 @@ final class EditorViewModel {
 
         isCompiling = true
         errorMessage = nil
+        compilationPhase = "Preparing…"
+        compileLogger.info("Compile requested for \(self.document.fileURL?.lastPathComponent ?? "untitled", privacy: .public)")
 
         Task { [weak self] in
             guard let self else { return }
+            defer {
+                self.isCompiling = false
+                self.compilationPhase = ""
+            }
 
             // Engine detection runs at launch; make sure it has finished (or
             // retry) before giving up with "engine not found".
             if self.compilerStatus == .checking {
+                self.compilationPhase = "Detecting LaTeX engine…"
                 await self.detectCompiler()
             }
             if case .notFound = self.compilerStatus {
                 self.errorMessage = CompilationError.engineNotFound.errorDescription
-                self.isCompiling = false
                 return
             }
 
+            self.compilationPhase = "Running LaTeX engine…"
             let result = await self.compiler.compile(
                 source: self.document.sourceText,
                 documentURL: self.document.fileURL
             )
 
+            self.compilationPhase = "Loading PDF…"
+
             switch result {
             case .success(let output):
+                self.lastBuildLog = output.log
+                self.lastBuildLogFile = output.logFileURL
+                self.lastCompilationDuration = output.duration
                 if let pdf = PDFDocument(data: output.pdfData) {
                     self.pdfDocument = pdf
                 } else {
                     self.errorMessage = "Failed to load generated PDF."
                 }
             case .failure(let error):
+                self.lastBuildLog = error.buildLog
+                self.lastBuildLogFile = error.buildLogFile
+                self.lastCompilationDuration = nil
                 self.errorMessage = error.errorDescription
             }
-
-            self.isCompiling = false
         }
+    }
+
+    func showBuildLogPanel() {
+        guard lastBuildLog != nil else { return }
+        showBuildLog = true
     }
 }

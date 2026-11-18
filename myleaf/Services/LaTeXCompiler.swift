@@ -1,24 +1,53 @@
 import Foundation
+import OSLog
+
+private let buildLogger = Logger(subsystem: "com.65zlui.myleaf", category: "build")
 
 enum CompilationError: LocalizedError {
     case engineNotFound
-    case compilationFailed(log: String)
-    case outputNotFound
-    case processError(String)
-    case timedOut(seconds: Int)
+    case compilationFailed(log: String, logFile: URL?)
+    case outputNotFound(log: String, logFile: URL?)
+    case processError(String, log: String, logFile: URL?)
+    case timedOut(seconds: Int, log: String, logFile: URL?)
 
     var errorDescription: String? {
         switch self {
         case .engineNotFound:
             return "No LaTeX engine found. Please install Tectonic via the button above."
-        case .compilationFailed(let log):
+        case .compilationFailed(let log, _):
             return log
         case .outputNotFound:
             return "Compilation succeeded but no PDF was generated."
-        case .processError(let msg):
+        case .processError(let msg, _, _):
             return "Failed to run LaTeX engine: \(msg)"
-        case .timedOut(let seconds):
+        case .timedOut(let seconds, _, _):
             return "Compilation timed out after \(seconds) seconds. Check your network connection (Tectonic downloads packages on first use) and try again."
+        }
+    }
+
+    /// The full, structured build log (engine output included), when there is one.
+    var buildLog: String? {
+        switch self {
+        case .compilationFailed(let log, _),
+             .outputNotFound(let log, _),
+             .processError(_, let log, _),
+             .timedOut(_, let log, _):
+            return log
+        case .engineNotFound:
+            return nil
+        }
+    }
+
+    /// Path of the persisted log file for this failure.
+    var buildLogFile: URL? {
+        switch self {
+        case .compilationFailed(_, let url),
+             .outputNotFound(_, let url),
+             .processError(_, _, let url),
+             .timedOut(_, _, let url):
+            return url
+        case .engineNotFound:
+            return nil
         }
     }
 }
@@ -53,6 +82,8 @@ enum CompilerStatus: Equatable {
 struct CompilationOutput {
     let pdfData: Data
     let log: String
+    let logFileURL: URL?
+    let duration: TimeInterval
 }
 
 final class LaTeXCompiler {
@@ -164,8 +195,12 @@ final class LaTeXCompiler {
     /// file with a command-line tool. The temporary file is removed afterwards.
     func compile(source: String, documentURL: URL? = nil) async -> Result<CompilationOutput, CompilationError> {
         guard let engine = engine else {
+            buildLogger.error("Compile requested but no engine is available")
             return .failure(.engineNotFound)
         }
+
+        let startedAt = Date()
+        buildLogger.info("Compile started with \(engine.displayName, privacy: .public)")
 
         let fm = FileManager.default
         let workDir = fm.temporaryDirectory
@@ -175,7 +210,10 @@ final class LaTeXCompiler {
         do {
             try fm.createDirectory(at: outDir, withIntermediateDirectories: true)
         } catch {
-            return .failure(.processError("Failed to create temp directory: \(error.localizedDescription)"))
+            return .failure(.processError(
+                "Failed to create temp directory: \(error.localizedDescription)",
+                log: "", logFile: nil
+            ))
         }
 
         // Compile from the project directory when possible so that relative
@@ -210,7 +248,10 @@ final class LaTeXCompiler {
                 compileFile = texFile
             } catch {
                 try? fm.removeItem(at: workDir)
-                return .failure(.processError("Failed to write temp files: \(error.localizedDescription)"))
+                return .failure(.processError(
+                    "Failed to write temp files: \(error.localizedDescription)",
+                    log: "", logFile: nil
+                ))
             }
         }
 
@@ -222,7 +263,7 @@ final class LaTeXCompiler {
         }
 
         guard let inputFile = compileFile else {
-            return .failure(.processError("No input file"))
+            return .failure(.processError("No input file", log: "", logFile: nil))
         }
 
         let workingDirectory = inputFile.deletingLastPathComponent()
@@ -239,34 +280,134 @@ final class LaTeXCompiler {
             ]
         }
 
-        let outcome = await runProcess(
+        let commandLine = ([engine.path] + arguments).map(Self.shellQuoted).joined(separator: " ")
+        buildLogger.info("Running: \(commandLine, privacy: .public)")
+
+        let engineLogURL = workDir.appendingPathComponent("build.log")
+        let run = await runProcess(
             executable: URL(fileURLWithPath: engine.path),
             arguments: arguments,
             workingDirectory: workingDirectory,
-            logURL: workDir.appendingPathComponent("build.log")
+            logURL: engineLogURL
         )
 
-        switch outcome {
-        case .failure(let error):
-            return .failure(error)
-        case .success(let exitCode):
-            let log = readLog(at: workDir.appendingPathComponent("build.log"))
+        let duration = Date().timeIntervalSince(startedAt)
+        let engineLog = readLog(at: engineLogURL)
+        let buildLog = makeBuildLog(
+            startedAt: startedAt,
+            duration: duration,
+            engine: engine,
+            inputFile: inputFile,
+            workingDirectory: workingDirectory,
+            arguments: arguments,
+            engineLog: engineLog,
+            run: run
+        )
+        let savedLogURL = BuildLogStore.save(buildLog, date: startedAt)
 
-            guard exitCode == 0 else {
-                return .failure(.compilationFailed(log: log.isEmpty ? "LaTeX engine exited with status \(exitCode)." : log))
-            }
-
-            // Tectonic names the output after the input file; pdflatex does the same.
-            let pdfURL = outDir
-                .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
-                .appendingPathExtension("pdf")
-
-            guard let data = try? Data(contentsOf: pdfURL), !data.isEmpty else {
-                return .failure(.outputNotFound)
-            }
-
-            return .success(CompilationOutput(pdfData: data, log: log))
+        if let launchError = run.launchError {
+            buildLogger.error("Failed to launch engine: \(launchError, privacy: .public)")
+            return .failure(.processError(launchError, log: buildLog, logFile: savedLogURL))
         }
+
+        if run.timedOut {
+            buildLogger.error("Compilation timed out after \(self.compilationTimeout) seconds")
+            return .failure(.timedOut(
+                seconds: Int(compilationTimeout),
+                log: buildLog,
+                logFile: savedLogURL
+            ))
+        }
+
+        let exitCode = run.exitCode ?? -1
+        guard exitCode == 0 else {
+            buildLogger.error("Compilation failed with exit status \(exitCode)")
+            return .failure(.compilationFailed(log: buildLog, logFile: savedLogURL))
+        }
+
+        // Tectonic names the output after the input file; pdflatex does the same.
+        let pdfURL = outDir
+            .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
+            .appendingPathExtension("pdf")
+
+        guard let data = try? Data(contentsOf: pdfURL), !data.isEmpty else {
+            buildLogger.error("Engine exited successfully but produced no PDF")
+            return .failure(.outputNotFound(log: buildLog, logFile: savedLogURL))
+        }
+
+        buildLogger.info("Compilation succeeded in \(duration, format: .fixed(precision: 2)) s")
+        return .success(CompilationOutput(
+            pdfData: data,
+            log: buildLog,
+            logFileURL: savedLogURL,
+            duration: duration
+        ))
+    }
+
+    // MARK: - Build Log
+
+    private func makeBuildLog(
+        startedAt: Date,
+        duration: TimeInterval,
+        engine: TeXEngine,
+        inputFile: URL,
+        workingDirectory: URL,
+        arguments: [String],
+        engineLog: String,
+        run: ProcessRunResult
+    ) -> String {
+        let command = ([engine.path] + arguments).map(Self.shellQuoted).joined(separator: " ")
+
+        var lines: [String] = [
+            "myleaf build log",
+            "================",
+            "Started: \(Self.logTimestamp(startedAt))",
+            "Engine: \(engine.displayName)",
+            "Engine path: \(engine.path)",
+            "Input: \(inputFile.path)",
+            "Working directory: \(workingDirectory.path)",
+            "Command: \(command)",
+            "Timeout: \(Int(compilationTimeout))s",
+            "",
+            "--- engine output ---",
+            engineLog.isEmpty ? "(no output)" : engineLog,
+            "",
+            "--- result ---",
+        ]
+
+        if let launchError = run.launchError {
+            lines.append("Launch error: \(launchError)")
+        } else if run.timedOut {
+            lines.append("Timed out after \(Int(compilationTimeout))s")
+        } else {
+            lines.append("Exit status: \(run.exitCode ?? -1)")
+        }
+
+        lines.append("Duration: \(String(format: "%.2f", duration))s")
+        lines.append("Finished: \(Self.logTimestamp(Date()))")
+        lines.append("")
+
+        return lines.joined(separator: "\n")
+    }
+
+    private static func shellQuoted(_ value: String) -> String {
+        guard !value.isEmpty else { return "''" }
+        let needsQuoting = value.rangeOfCharacter(
+            from: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'\\$`"))
+        ) != nil
+        guard needsQuoting else { return value }
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private static let logTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter
+    }()
+
+    private static func logTimestamp(_ date: Date) -> String {
+        logTimestampFormatter.string(from: date)
     }
 
     // MARK: - Process Execution
@@ -277,20 +418,26 @@ final class LaTeXCompiler {
     /// with `Pipe` can deadlock once the child writes more than the 64 KB pipe
     /// buffer (very common with verbose LaTeX logs). File redirection has no
     /// such limit.
+    private struct ProcessRunResult {
+        var exitCode: Int32? = nil
+        var timedOut: Bool = false
+        var launchError: String? = nil
+    }
+
     private func runProcess(
         executable: URL,
         arguments: [String],
         workingDirectory: URL,
         logURL: URL
-    ) async -> Result<Int32, CompilationError> {
+    ) async -> ProcessRunResult {
         let timeout = compilationTimeout
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Result<Int32, CompilationError>, Never>) in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<ProcessRunResult, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let fm = FileManager.default
                 fm.createFile(atPath: logURL.path, contents: nil)
 
                 guard let logHandle = try? FileHandle(forWritingTo: logURL) else {
-                    continuation.resume(returning: .failure(.processError("Failed to open log file")))
+                    continuation.resume(returning: ProcessRunResult(launchError: "Failed to open log file"))
                     return
                 }
 
@@ -305,7 +452,7 @@ final class LaTeXCompiler {
                     try process.run()
                 } catch {
                     try? logHandle.close()
-                    continuation.resume(returning: .failure(.processError(error.localizedDescription)))
+                    continuation.resume(returning: ProcessRunResult(launchError: error.localizedDescription))
                     return
                 }
 
@@ -329,9 +476,9 @@ final class LaTeXCompiler {
                 try? logHandle.close()
 
                 if timedOut {
-                    continuation.resume(returning: .failure(.timedOut(seconds: Int(timeout))))
+                    continuation.resume(returning: ProcessRunResult(timedOut: true))
                 } else {
-                    continuation.resume(returning: .success(process.terminationStatus))
+                    continuation.resume(returning: ProcessRunResult(exitCode: process.terminationStatus))
                 }
             }
         }
