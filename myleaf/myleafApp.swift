@@ -39,7 +39,7 @@ struct myleafApp: App {
 
     init() {
         AntiDebug.apply()
-        MemoryMonitor.start()
+        MemoryMonitor.shared.start()
     }
 
     var body: some Scene {

@@ -1,8 +1,9 @@
-# myleaf 1.2.0
+# myleaf 1.3.0
 
 A native macOS LaTeX editor for academic writing — now with a hardened,
 project-aware compilation pipeline, build logs with phase timings, automatic
-selection of the newest installed Tectonic engine, and a proper app icon.
+selection of the newest installed Tectonic engine, process memory diagnostics,
+and a proper app icon.
 
 ## Highlights
 
@@ -39,6 +40,17 @@ selection of the newest installed Tectonic engine, and a proper app icon.
 - Compilation progress now shows the current phase (detecting engine, running
   engine, loading PDF), and phases are also written to the unified system log.
 
+### Diagnostics
+- Settings now shows the process's physical memory footprint, peak footprint,
+  resident memory, sample count, and a "Sample Now" action.
+- Footprint is sampled every 2 s with `task_info(TASK_VM_INFO)` (very low
+  overhead) and published to SwiftUI.
+- One sample per minute is persisted to
+  `~/Library/Logs/myleaf/memory-YYYYMMDD.jsonl`; the last 7 days are kept.
+- The previous automatic `leaks` CLI loop (which suspended the process every
+  minute) has been removed; memory monitoring is now lightweight and also
+  available in Release builds.
+
 ### Editor
 - Syntax highlighting now gives comments the final word, ignores escaped `%`,
   and colors `\begin`/`\end` and math delimiters correctly.
@@ -71,7 +83,7 @@ selection of the newest installed Tectonic engine, and a proper app icon.
 - Pandoc export no longer calls `NSSavePanel` from a background executor and
   cannot deadlock on stderr.
 - Removed the hardcoded developer-specific template path.
-- Added compiler, build-log, and view-model integration tests.
+- Added compiler, build-log, memory-monitor, and view-model integration tests.
 - Unit tests run serially by default to avoid concurrent Tectonic cache
   contention.
 
@@ -79,10 +91,10 @@ selection of the newest installed Tectonic engine, and a proper app icon.
 
 Choose one:
 
-- **Installer package (recommended):** double-click `myleaf-1.2.pkg` and follow
+- **Installer package (recommended):** double-click `myleaf-1.3.pkg` and follow
   the Installer. myleaf is installed to `/Applications`.
-- **DMG:** open `myleaf-1.2.dmg` and drag **myleaf** into **Applications**.
-- **ZIP:** unzip `myleaf-1.2.zip` and move **myleaf** to **Applications**.
+- **DMG:** open `myleaf-1.3.dmg` and drag **myleaf** into **Applications**.
+- **ZIP:** unzip `myleaf-1.3.zip` and move **myleaf** to **Applications**.
 
 First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
 or run:
@@ -96,7 +108,7 @@ click.
 
 ## Uninstall
 
-**Full uninstall** — double-click `myleaf-uninstaller-1.2.pkg` (DMG:
+**Full uninstall** — double-click `myleaf-uninstaller-1.3.pkg` (DMG:
 `Uninstall myleaf.pkg`). It quits myleaf and removes:
 
 - `/Applications/myleaf.app`
@@ -106,7 +118,7 @@ click.
   container
 
 **Uninstall but keep data** — double-click
-`myleaf-uninstaller-keepdata-1.2.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
+`myleaf-uninstaller-keepdata-1.3.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
 It removes only `/Applications/myleaf.app`; tools, build logs, preferences,
 recent-project history, and caches remain so a later install restores your
 setup.

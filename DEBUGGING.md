@@ -2,10 +2,10 @@
 
 > 时间：2026-11-18 ~ 2026-11-19
 > 仓库：`git@github.com:65zlui/Myleaf.git`（`main`）
-> 对应版本：v1.2.0
+> 对应版本：v1.3.0
 >
 > 本文记录的是**定位问题、修改代码、验证修复**的过程，而不是应用运行时的操作日志。
-> 应用运行时的编译日志见下文第 6 节（功能实现）以及 `~/Library/Logs/myleaf/`。
+> 应用运行时的编译日志见下文第 5 节（功能实现）以及 `~/Library/Logs/myleaf/`。
 
 ---
 
@@ -313,7 +313,7 @@ xattr -lr build/Build/Products/Release/myleaf.app
 **验证**
 
 ```text
-myleaf-1.2.dmg: valid on disk / satisfies its Designated Requirement
+myleaf-1.3.dmg: valid on disk / satisfies its Designated Requirement
 Signature=adhoc, Format=universal (x86_64 arm64), Runtime Version=15.5.0
 ```
 
@@ -466,17 +466,17 @@ prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
 
 `pkgbuild` 生成三个本地包，对应三种路径：
 
-1. **`myleaf-1.2.pkg`**（完整安装）
+1. **`myleaf-1.3.pkg`**（完整安装）
    - 用 `--root` 构造 payload：`Applications/myleaf.app`，安装位置 `/`。
    - `preinstall` 先 `pkill -x myleaf`，避免覆盖正在运行的应用。
    - 验证方式：`pkgutil --expand-full` 解开 payload，确认 `codesign --verify`
      仍通过（payload 里的 app 签名有效）。
-2. **`myleaf-uninstaller-1.2.pkg`**（完整卸载）
+2. **`myleaf-uninstaller-1.3.pkg`**（完整卸载）
    - `pkgbuild --nopayload`，只用 `preinstall` 执行清理。
    - 删除 `/Applications/myleaf.app`、应用管理的 Tectonic/Pandoc、编译日志、
      Tectonic 缓存、应用缓存、偏好设置、窗口状态、旧沙盒容器。
    - 保留用户 `.tex` 项目和系统安装的 TeX/Pandoc。
-3. **`myleaf-uninstaller-keepdata-1.2.pkg`**（卸载但保留数据）
+3. **`myleaf-uninstaller-keepdata-1.3.pkg`**（卸载但保留数据）
    - 只删除 `/Applications/myleaf.app`。
    - 保留 `Application Support/myleaf`（工具）、`Logs/myleaf`（编译日志）、
      偏好设置/最近项目、Tectonic 缓存等，重新安装后可恢复原状态。
@@ -493,7 +493,7 @@ prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
 
 ---
 
-## 5. 新增：运行时编译日志（应用内功能）
+## 5. 运行时日志与诊断
 
 需求：记录每次 LaTeX 编译的执行流程，并能回看。
 
@@ -543,6 +543,32 @@ Finished: 2026-11-19 00:12:31.539
 - 编译测试断言日志包含 `myleaf build log`、`Exit status: 0`、引擎名，且日志文件真实存在。
 - ViewModel 测试断言 `lastBuildLog` 非空、`lastCompilationDuration` 有值。
 
+### 5.2 内存占用监控（v1.3）
+
+原先的 `MemoryMonitor` 只在 DEBUG 下每 60 秒调用两次 `leaks` CLI，
+既重又会短暂挂起进程。现在改为轻量的内存采样：
+
+- 通过 Mach `task_info(TASK_VM_INFO)` 读取：
+  - `phys_footprint`：物理内存占用（与系统 `footprint` 工具一致）
+  - `resident_size`、`virtual_size`
+- 每 2 秒采样一次，主线程更新 `@Observable` 状态
+- 启动 10 秒后写第一条持久化样本，之后每 60 秒一条：
+  `~/Library/Logs/myleaf/memory-YYYYMMDD.jsonl`
+- 自动保留最近 7 天
+- 设置页新增 Diagnostics：
+  - Current memory / Peak memory / Resident memory
+  - 采样次数、Sample Now、Show log
+- Release 构建同样启用（开销极低）
+
+**验证**
+
+- 单元测试 `MemoryMonitorTests.reportsMemoryFootprint`
+- 实际运行 Debug 构建：
+  - 应用采样 `phys_footprint ≈ 23 MB`
+  - 系统 `/usr/bin/footprint -p <pid>` 显示 `Footprint: 22 MB`，两者一致
+  - `~/Library/Logs/myleaf/memory-20261119.jsonl` 正常写入
+- 现有 51 个测试全部通过
+
 ---
 
 ## 6. 验证矩阵
@@ -557,19 +583,21 @@ Finished: 2026-11-19 00:12:31.539
 | 引擎版本选择 | harness `detectEngine()` | 选中 Tectonic 0.17.0（而非应用内 0.16.9） |
 | 阶段耗时 | Build Log + 测试断言 | preparation / engine / pdf / total 均有值 |
 | 编译耗时 | harness | 0.335s（修复前 5–7s） |
-| 测试耗时 | 50 个测试 | 2.85s（修复前约 19s） |
+| 测试耗时 | 51 个测试 | 4.3s（修复前约 19s） |
+| 内存采样 | 运行 Debug 构建 + `footprint -p` | 23 MB vs 22 MB，一致 |
+| 内存日志 | 查看 `~/Library/Logs/myleaf/memory-*.jsonl` | 启动 10s 后写入，之后每分钟一条 |
 | Release 启动 | `open` + `pgrep` + 截图 | 正常，AntiDebug 未误杀 |
 | DMG 签名 | `codesign --verify --deep --strict` | 通过 |
 | DMG 启动 | 挂载后运行 | 正常 |
 | 安装包 payload | `pkgutil --expand-full` + `codesign --verify` | 通过，payload 内 app 签名有效 |
-| 安装包元数据 | 查看 `PackageInfo` | `com.65zlui.myleaf`，1.2，min OS 14.0，含 preinstall |
+| 安装包元数据 | 查看 `PackageInfo` | `com.65zlui.myleaf`，1.3，min OS 14.0，含 preinstall |
 | 卸载包结构 | `pkgutil --expand-full` | 两个包均无 payload，preinstall 可执行 |
 | 完整卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用与数据目录被删除，退出码 0 |
 | 保留数据卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用被删除，工具/日志/偏好保留 |
 | DMG 内容 | `hdiutil attach` | app + Applications 链接 + 两个卸载包 |
 | 应用图标 | 构建产物 `AppIcon.icns` + 截图 | 已生效 |
 
-测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）→ 50（引擎版本比较与阶段耗时断言）。
+测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）→ 50（引擎版本比较与阶段耗时断言）→ 51（内存采样）。
 
 ---
 
@@ -585,8 +613,9 @@ Finished: 2026-11-19 00:12:31.539
 | `fe188d3` | 打包 `.app` 副本的 FileProvider 元数据清理 |
 | v1.1 提交 | 运行时编译日志、窗口状态恢复修复、pkg 安装/卸载包、本调试记录 |
 | v1.2 提交 | 引擎版本探测/最新版选择 + Build Log 阶段耗时 |
+| v1.3 提交 | 内存占用监控（task_info 采样 + JSONL 日志 + 设置页 Diagnostics） |
 
-标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）。
+标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）。
 
 ---
 

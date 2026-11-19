@@ -1,114 +1,197 @@
 import Foundation
+import Darwin
+import OSLog
 
-/// Lightweight memory leak detection using the `leaks` CLI tool.
-/// Only active in DEBUG builds.
-enum MemoryMonitor {
+/// A single memory reading for the running process.
+struct MemorySample: Codable, Sendable {
+    let timestamp: Date
+    /// Physical memory footprint reported by the kernel (includes compressed memory).
+    let physicalFootprint: UInt64
+    /// Resident set size (pages currently in RAM).
+    let residentSize: UInt64
+    let virtualSize: UInt64
+}
 
-    private static var isRunning = false
-    private static var timer: DispatchSourceTimer?
+/// Lightweight process memory monitor.
+///
+/// Samples `task_info(TASK_VM_INFO)` every few seconds and publishes the
+/// current/peak footprint to SwiftUI. One JSONL sample is appended to
+/// `~/Library/Logs/myleaf/memory-YYYYMMDD.jsonl` per minute (last 7 days kept).
+@Observable
+@MainActor
+final class MemoryMonitor {
 
-    /// Start periodic leak checking (every 60 seconds).
-    /// Does nothing in RELEASE builds or if already running.
-    static func start() {
-        #if DEBUG
+    static let shared = MemoryMonitor()
+
+    private(set) var currentFootprint: UInt64 = 0
+    private(set) var peakFootprint: UInt64 = 0
+    private(set) var residentSize: UInt64 = 0
+    private(set) var virtualSize: UInt64 = 0
+    private(set) var lastSampleDate: Date?
+    private(set) var sampleCount = 0
+    private(set) var logFileURL: URL?
+    private(set) var isRunning = false
+
+    private let sampleInterval: TimeInterval = 2
+    private let logInterval: TimeInterval = 60
+    private let maxLogDays = 7
+
+    private var timer: DispatchSourceTimer?
+    private var nextLogDate = Date.distantPast
+    private let sampleQueue = DispatchQueue(label: "com.65zlui.myleaf.memory", qos: .utility)
+    private let logQueue = DispatchQueue(label: "com.65zlui.myleaf.memory.log", qos: .utility)
+    private let logger = Logger(subsystem: "com.65zlui.myleaf", category: "memory")
+
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd"
+        return formatter
+    }()
+
+    private init() {}
+
+    // MARK: - Lifecycle
+
+    func start() {
         guard !isRunning else { return }
-
-        let pid = ProcessInfo.processInfo.processIdentifier
-        console("MemoryMonitor started for pid \(pid)")
-
         isRunning = true
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 30, repeating: .seconds(60), leeway: .seconds(10))
-        t.setEventHandler { runLeaksCheck() }
-        t.resume()
-        timer = t
 
-        // First check after a short delay
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 5) {
-            runLeaksCheck()
+        prepareLogDirectory()
+
+        // Give AppKit/SwiftUI a few seconds to finish launching before the
+        // first persisted sample, otherwise it records a near-empty process.
+        nextLogDate = Date().addingTimeInterval(10)
+        sampleNow()
+
+        let timer = DispatchSource.makeTimerSource(queue: sampleQueue)
+        timer.schedule(
+            deadline: .now() + sampleInterval,
+            repeating: sampleInterval,
+            leeway: .milliseconds(500)
+        )
+        timer.setEventHandler { [weak self] in
+            let sample = Self.capture()
+            Task { @MainActor [weak self] in
+                self?.apply(sample)
+            }
         }
-        #else
-        // No-op in Release
-        #endif
+        timer.resume()
+        self.timer = timer
+
+        logger.info("Memory monitor started")
     }
 
-    /// Stop periodic checking.
-    static func stop() {
-        #if DEBUG
+    func stop() {
         timer?.cancel()
         timer = nil
         isRunning = false
-        console("MemoryMonitor stopped")
-        #endif
+        logger.info("Memory monitor stopped")
     }
 
-    /// Trigger an immediate leak check.
-    static func check() {
-        #if DEBUG
-        runLeaksCheck()
-        #endif
+    /// Takes a reading immediately (used by the Diagnostics panel and tests).
+    func sampleNow() {
+        apply(Self.capture())
     }
 
-    // MARK: - Private
+    // MARK: - Sampling
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
+    private func apply(_ sample: MemorySample) {
+        currentFootprint = sample.physicalFootprint
+        peakFootprint = max(peakFootprint, sample.physicalFootprint)
+        residentSize = sample.residentSize
+        virtualSize = sample.virtualSize
+        lastSampleDate = sample.timestamp
+        sampleCount += 1
 
-    private static func console(_ message: String) {
-        let ts = dateFormatter.string(from: Date())
-        print("[\(ts)] [MemoryMonitor] \(message)")
-    }
-
-    private static func runLeaksCheck() {
-        let pid = ProcessInfo.processInfo.processIdentifier
-
-        // Check for leaks using the `leaks` command with --output to get machine-readable results
-        let output = shell("/usr/bin/leaks", "\(pid)", "--output=/dev/stdout")
-        let stderr = shell("/usr/bin/leaks", "\(pid)", "--nostacks")
-
-        if output.contains("leaks Report") || stderr.contains("leaks Report") {
-            // Leaks found
-            let combined = output + stderr
-            // Count the number of leaked objects
-            let leakCount = combined.components(separatedBy: "leak").count - 1
-            let processCount = combined.components(separatedBy: "Process").count - 1
-            let totalLeaks = leakCount + processCount
-
-            if totalLeaks > 0 {
-                console("⚠️  \(totalLeaks) leak(s) detected!")
-                // Print the first ~15 lines of the leak report
-                let lines = combined.components(separatedBy: "\n")
-                for line in lines.prefix(20) where !line.isEmpty {
-                    if line.contains("leak") || line.contains("Leak") || line.contains("Process") {
-                        print("  \(line.trimmingCharacters(in: .whitespaces))")
-                    }
-                }
-            } else {
-                console("No leaks detected ✅")
-            }
-        } else {
-            console("No leaks detected ✅")
+        if sample.timestamp >= nextLogDate {
+            nextLogDate = sample.timestamp.addingTimeInterval(logInterval)
+            writeLog(sample)
         }
     }
 
-    /// Run a shell command and return its output.
-    @discardableResult
-    private static func shell(_ args: String...) -> String {
-        let process = Process()
-        process.launchPath = "/usr/bin/env"
-        process.arguments = args
+    nonisolated private static func capture() -> MemorySample {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size
+        )
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
 
-        process.launch()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        guard result == KERN_SUCCESS else {
+            return MemorySample(
+                timestamp: Date(),
+                physicalFootprint: 0,
+                residentSize: 0,
+                virtualSize: 0
+            )
+        }
 
-        return String(data: data, encoding: .utf8) ?? ""
+        return MemorySample(
+            timestamp: Date(),
+            physicalFootprint: UInt64(info.phys_footprint),
+            residentSize: UInt64(info.resident_size),
+            virtualSize: UInt64(info.virtual_size)
+        )
+    }
+
+    // MARK: - Persistence
+
+    private var logDirectory: URL {
+        let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
+        return library
+            .appendingPathComponent("Logs", isDirectory: true)
+            .appendingPathComponent("myleaf", isDirectory: true)
+    }
+
+    private func prepareLogDirectory() {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: logDirectory, withIntermediateDirectories: true)
+
+        guard let files = try? fm.contentsOfDirectory(
+            at: logDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+
+        let memoryLogs = files
+            .filter { $0.lastPathComponent.hasPrefix("memory-") && $0.pathExtension == "jsonl" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        for url in memoryLogs.dropLast(maxLogDays) {
+            try? fm.removeItem(at: url)
+        }
+    }
+
+    private func writeLog(_ sample: MemorySample) {
+        let url = logDirectory
+            .appendingPathComponent("memory-\(Self.dayFormatter.string(from: sample.timestamp)).jsonl")
+        logFileURL = url
+
+        guard var line = try? Self.encoder.encode(sample) else { return }
+        line.append(0x0A)
+
+        logQueue.async {
+            let fm = FileManager.default
+            if !fm.fileExists(atPath: url.path) {
+                fm.createFile(atPath: url.path, contents: nil)
+            }
+            guard let handle = try? FileHandle(forWritingTo: url) else { return }
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: line)
+        }
     }
 }

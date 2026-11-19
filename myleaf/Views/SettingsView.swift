@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -31,6 +32,7 @@ struct SettingsView: View {
                     autoSaveSection
                     toolManagementSection
                     diskUsageSection
+                    diagnosticsSection
                 }
                 .padding()
             }
@@ -214,6 +216,74 @@ struct SettingsView: View {
             Text("Tools are stored in ~/Library/Application Support/myleaf/bin/")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: - Diagnostics Section
+
+    private var memory: MemoryMonitor { .shared }
+
+    private var diagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Diagnostics", systemImage: "gauge.with.dots.needle.67percent")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 8) {
+                diagnosticRow(
+                    "Current memory",
+                    Int64(memory.currentFootprint).formattedFileSize
+                )
+                diagnosticRow(
+                    "Peak memory",
+                    Int64(memory.peakFootprint).formattedFileSize
+                )
+                diagnosticRow(
+                    "Resident memory",
+                    Int64(memory.residentSize).formattedFileSize
+                )
+
+                HStack(spacing: 8) {
+                    Text("Samples")
+                        .font(.callout)
+                    Text("\(memory.sampleCount)")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Sample Now") {
+                        memory.sampleNow()
+                    }
+                    .controlSize(.small)
+                }
+
+                if let logURL = memory.logFileURL {
+                    HStack(spacing: 8) {
+                        Text("Memory log")
+                            .font(.callout)
+                        Spacer()
+                        Button("Show") {
+                            NSWorkspace.shared.activateFileViewerSelecting([logURL])
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+
+            Text("Physical footprint sampled every 2 s. One sample per minute is written to ~/Library/Logs/myleaf/memory-*.jsonl; the last 7 days are kept.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func diagnosticRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.callout)
+            Spacer()
+            Text(value)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
         }
     }
 
