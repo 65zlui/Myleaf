@@ -36,8 +36,14 @@ project-aware compilation pipeline, full build logs, and a proper app icon.
 - New app icon (all macOS sizes).
 - Universal binary: Apple Silicon + Intel.
 - Minimum supported macOS is now 14.0 (Sonoma), matching the README.
-- Reproducible release packaging: `scripts/package-app.sh` produces a DMG, a
-  ZIP, and `SHA256SUMS.txt`; both archives contain the signed `myleaf.app`.
+- Reproducible release packaging: `scripts/package-app.sh` produces an
+  installer `.pkg`, a matching uninstaller `.pkg`, a DMG, a ZIP, and
+  `SHA256SUMS.txt`.
+- The installer package puts myleaf in `/Applications`; the uninstaller quits
+  the app and removes the bundle, app-managed tools, build logs, caches,
+  preferences, saved state, and the legacy sandbox container. Projects and
+  system TeX/Pandoc installs are left untouched.
+- The DMG also includes the uninstaller package.
 - Hardened Runtime; ad-hoc signed (no paid Developer ID).
 - Fixed the anti-debug `PT_DENY_ATTACH` constant.
 
@@ -53,15 +59,35 @@ project-aware compilation pipeline, full build logs, and a proper app icon.
 
 ## Installation
 
-1. Download `myleaf-1.1.dmg` (or `myleaf-1.1.zip`).
-2. Open the DMG and drag **myleaf** into **Applications**.
-3. First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
-   or run:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/myleaf.app
-   ```
-4. If no LaTeX engine is found, open Settings (⌘,) and install Tectonic with
-   one click.
+Choose one:
+
+- **Installer package (recommended):** double-click `myleaf-1.1.pkg` and follow
+  the Installer. myleaf is installed to `/Applications`.
+- **DMG:** open `myleaf-1.1.dmg` and drag **myleaf** into **Applications**.
+- **ZIP:** unzip `myleaf-1.1.zip` and move **myleaf** to **Applications**.
+
+First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
+or run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/myleaf.app
+```
+
+If no LaTeX engine is found, open Settings (⌘,) and install Tectonic with one
+click.
+
+## Uninstall
+
+Double-click `myleaf-uninstaller-1.1.pkg` (also included in the DMG). It quits
+myleaf and removes the application plus its per-user data:
+
+- `/Applications/myleaf.app`
+- `~/Library/Application Support/myleaf` (Tectonic/Pandoc installed by the app)
+- `~/Library/Logs/myleaf`, Tectonic caches, preferences, saved state, and the
+  legacy sandbox container
+
+`.tex` projects and system TeX/Pandoc installations are never removed. A manual
+removal command is listed in the README.
 
 **Requirements:** macOS 14.0 or later, Apple Silicon or Intel.
 
@@ -72,7 +98,8 @@ project-aware compilation pipeline, full build logs, and a proper app icon.
 
 ## Known limitations
 
-- Builds are ad-hoc signed, so Gatekeeper shows an "unidentified developer"
-  warning on other Macs until a Developer ID certificate is configured.
+- Builds and packages are ad-hoc signed, so Gatekeeper shows an "unidentified
+  developer" warning on other Macs until Developer ID certificates are
+  configured. Right-click → Open works for both the app and the `.pkg`.
 - Word export requires Pandoc (installed from within the app).
 - pdflatex fallback runs a single pass; Tectonic performs automatic reruns.

@@ -72,13 +72,40 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 - macOS 14.0 (Sonoma) 或更高版本
 - Apple Silicon (ARM64) 或 Intel (x86_64)
 
-### 下载
+### 安装
 
-从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版 `.dmg`（或 `.zip`），将 **myleaf** 拖入 Applications 文件夹即可。
+从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版本：
+
+- **安装包（推荐）**：`myleaf-1.1.pkg` —— 双击并按提示安装，应用会安装到 `/Applications`。
+- **DMG / ZIP**：打开 DMG（或解压 ZIP），将 **myleaf** 拖入 Applications 文件夹。
 
 > **首次启动**：应用会自动检测 LaTeX 引擎。如未安装，可在设置中一键安装 Tectonic（约 25MB）。
 
-> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止首次启动，请右键点击应用选择「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/myleaf.app`。
+> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止安装包或应用，请右键选择「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/myleaf.app`。
+
+### 卸载
+
+双击 `myleaf-uninstaller-1.1.pkg`（DMG 中同样附带）。它会退出应用并删除：
+
+- `/Applications/myleaf.app`
+- 应用管理的工具：`~/Library/Application Support/myleaf`（Tectonic / Pandoc）
+- 编译日志：`~/Library/Logs/myleaf`
+- Tectonic 缓存、偏好设置、窗口状态、旧版沙盒容器
+
+你的 `.tex` 项目文件，以及系统安装的 TeX / Pandoc **不会**被删除。
+
+如需手动卸载：
+
+```bash
+sudo rm -rf /Applications/myleaf.app
+rm -rf ~/Library/Application\ Support/myleaf \
+       ~/Library/Logs/myleaf \
+       ~/Library/Caches/Tectonic \
+       ~/Library/Caches/com.65zlui.myleaf \
+       ~/Library/Preferences/com.65zlui.myleaf.plist \
+       ~/Library/Saved\ Application\ State/com.65zlui.myleaf.savedState \
+       ~/Library/Containers/com.65zlui.myleaf
+```
 
 ### 从源码构建
 
@@ -96,7 +123,13 @@ open myleaf.xcodeproj
 ./scripts/package-app.sh
 ```
 
-构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成 `dist/myleaf-1.1.dmg`、`dist/myleaf-1.1.zip` 和 `SHA256SUMS.txt`。两个压缩包内均包含已签名的 `myleaf.app`。
+构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
+
+- `dist/myleaf-1.1.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-1.1.pkg` —— 卸载包
+- `dist/myleaf-1.1.dmg` —— 拖拽安装镜像（内含卸载包）
+- `dist/myleaf-1.1.zip`
+- `dist/SHA256SUMS.txt`
 
 ---
 

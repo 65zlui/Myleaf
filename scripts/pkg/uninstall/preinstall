@@ -1,0 +1,63 @@
+#!/bin/bash
+# myleaf uninstaller.
+#
+# This package intentionally has no payload: Installer only runs this script.
+# It removes the application and the data myleaf creates for the current
+# console user, including tools downloaded by the app (Tectonic/Pandoc).
+
+set -u
+
+LOG="/tmp/myleaf-uninstall.log"
+exec >>"$LOG" 2>&1
+echo "=== myleaf uninstall $(/bin/date) ==="
+
+# Stop the app before deleting its bundle.
+/usr/bin/pkill -x myleaf >/dev/null 2>&1 || true
+
+# 1. Application bundle.
+#    (The MYLEAF_* overrides exist so the script can be exercised in a temp dir.)
+APP_PATH="${MYLEAF_UNINSTALL_APP_PATH:-/Applications/myleaf.app}"
+if [ -d "$APP_PATH" ]; then
+    /bin/rm -rf "$APP_PATH" && echo "Removed $APP_PATH"
+fi
+
+# 2. Per-user data of the console user (Installer runs this script as root).
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+if [ -n "${CONSOLE_USER:-}" ] && [ "$CONSOLE_USER" != "root" ]; then
+    USER_HOME="$(/usr/bin/dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null \
+        | /usr/bin/awk '{print $2}')"
+else
+    USER_HOME=""
+fi
+
+if [ -n "${MYLEAF_UNINSTALL_HOME:-}" ]; then
+    USER_HOME="$MYLEAF_UNINSTALL_HOME"
+    CONSOLE_USER="${MYLEAF_UNINSTALL_HOME}"
+fi
+
+if [ -n "${USER_HOME:-}" ] && [ -d "$USER_HOME" ]; then
+        echo "Removing user data for ${CONSOLE_USER:-unknown} ($USER_HOME)"
+
+        # App-managed tools and build logs.
+        /bin/rm -rf "$USER_HOME/Library/Application Support/myleaf"
+        /bin/rm -rf "$USER_HOME/Library/Logs/myleaf"
+
+        # Tectonic package cache.
+        /bin/rm -rf "$USER_HOME/Library/Caches/Tectonic"
+        /bin/rm -rf "$USER_HOME/.cache/Tectonic"
+
+        # Preferences, saved state, and legacy sandbox container.
+        /bin/rm -rf "$USER_HOME/Library/Preferences/com.65zlui.myleaf.plist"
+        /bin/rm -rf "$USER_HOME/Library/Preferences/com.65zlui.myleaf.plist.lockfile"
+        /bin/rm -rf "$USER_HOME/Library/Saved Application State/com.65zlui.myleaf.savedState"
+        /bin/rm -rf "$USER_HOME/Library/Containers/com.65zlui.myleaf"
+        /bin/rm -rf "$USER_HOME/Library/HTTPStorages/com.65zlui.myleaf"
+        /bin/rm -rf "$USER_HOME/Library/Application Scripts/com.65zlui.myleaf"
+fi
+
+# 3. Forget the application's installer receipt (via the package database),
+#    so a later install is treated as a fresh installation.
+/usr/sbin/pkgutil --forget com.65zlui.myleaf >/dev/null 2>&1 || true
+
+echo "=== myleaf uninstall finished ==="
+exit 0

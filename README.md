@@ -69,13 +69,40 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 - macOS 14.0 (Sonoma) or later
 - Apple Silicon (ARM64) or Intel (x86_64)
 
-### Download
+### Install
 
-Grab the latest `.dmg` (or `.zip`) from the [Releases](https://github.com/65zlui/myleaf/releases) page and drag **myleaf** into your Applications folder.
+Download the latest release from the [Releases](https://github.com/65zlui/myleaf/releases) page:
+
+- **Installer package (recommended)**: `myleaf-1.1.pkg` — double-click, follow the Installer, and myleaf is installed to `/Applications`.
+- **DMG / ZIP**: open the DMG (or unzip) and drag **myleaf** into your Applications folder.
 
 > **First launch**: The app will automatically detect available LaTeX engines. If none are found, you can install Tectonic with one click in Settings (~25MB download).
 
-> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the first launch, right-click the app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/myleaf.app`.
+> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the installer or app, right-click it and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/myleaf.app`.
+
+### Uninstall
+
+Run `myleaf-uninstaller-1.1.pkg` (also included in the DMG). It quits the app and removes:
+
+- `/Applications/myleaf.app`
+- App-managed tools in `~/Library/Application Support/myleaf` (Tectonic/Pandoc)
+- Build logs in `~/Library/Logs/myleaf`
+- Tectonic cache, preferences, saved state, and the legacy sandbox container
+
+Your `.tex` projects and any system TeX/Pandoc installations are **never** touched.
+
+Manual removal, if you prefer:
+
+```bash
+sudo rm -rf /Applications/myleaf.app
+rm -rf ~/Library/Application\ Support/myleaf \
+       ~/Library/Logs/myleaf \
+       ~/Library/Caches/Tectonic \
+       ~/Library/Caches/com.65zlui.myleaf \
+       ~/Library/Preferences/com.65zlui.myleaf.plist \
+       ~/Library/Saved\ Application\ State/com.65zlui.myleaf.savedState \
+       ~/Library/Containers/com.65zlui.myleaf
+```
 
 ### Build from Source
 
@@ -93,7 +120,13 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 ./scripts/package-app.sh
 ```
 
-Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes `dist/myleaf-1.1.dmg`, `dist/myleaf-1.1.zip`, and `SHA256SUMS.txt`. Both archives contain the signed `myleaf.app`.
+Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
+
+- `dist/myleaf-1.1.pkg` — installer (installs to `/Applications`)
+- `dist/myleaf-uninstaller-1.1.pkg` — uninstaller
+- `dist/myleaf-1.1.dmg` — drag-to-Applications image (includes the uninstaller)
+- `dist/myleaf-1.1.zip`
+- `dist/SHA256SUMS.txt`
 
 ---
 
