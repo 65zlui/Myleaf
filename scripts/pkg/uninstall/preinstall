@@ -46,6 +46,10 @@ if [ -n "${USER_HOME:-}" ] && [ -d "$USER_HOME" ]; then
         /bin/rm -rf "$USER_HOME/Library/Caches/Tectonic"
         /bin/rm -rf "$USER_HOME/.cache/Tectonic"
 
+        # App caches (PDF previews, HTTP cache).
+        /bin/rm -rf "$USER_HOME/Library/Caches/com.65zlui.myleaf"
+        /bin/rm -rf "$USER_HOME/Library/Caches/myleaf"
+
         # Preferences, saved state, and legacy sandbox container.
         /bin/rm -rf "$USER_HOME/Library/Preferences/com.65zlui.myleaf.plist"
         /bin/rm -rf "$USER_HOME/Library/Preferences/com.65zlui.myleaf.plist.lockfile"

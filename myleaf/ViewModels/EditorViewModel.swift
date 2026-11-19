@@ -11,6 +11,7 @@ final class EditorViewModel {
 
     var document = LaTeXDocument()
     var pdfDocument: PDFDocument?
+    private(set) var pdfCacheURL: URL?
     var isCompiling = false
     var errorMessage: String?
     var compilerStatus: CompilerStatus = .checking
@@ -49,6 +50,7 @@ final class EditorViewModel {
 
     init() {
         savedText = document.sourceText
+        PDFCache.prune()
         Task { [weak self] in
             await self?.detectCompiler()
         }
@@ -100,7 +102,7 @@ final class EditorViewModel {
 
     func applyTemplate(_ template: Template) {
         document = LaTeXDocument(sourceText: template.content)
-        pdfDocument = nil
+        clearPDFPreview()
         errorMessage = nil
         savedText = document.sourceText
         showWelcome = false
@@ -154,7 +156,7 @@ final class EditorViewModel {
             let content = try Self.readText(from: url)
             document = LaTeXDocument(sourceText: content, fileURL: url)
             savedText = content
-            pdfDocument = nil
+            clearPDFPreview()
             errorMessage = nil
             historyManager.recordProject(url)
         } catch {
@@ -166,10 +168,18 @@ final class EditorViewModel {
 
     func newDocument() {
         document = LaTeXDocument()
-        pdfDocument = nil
+        clearPDFPreview()
         errorMessage = nil
         savedText = document.sourceText
         showWelcome = false
+    }
+
+    private func clearPDFPreview() {
+        pdfDocument = nil
+        pdfCacheURL = nil
+        // Cached PDFs are pruned by PDFCache (max 3) rather than deleted here:
+        // the old PDFDocument may still be referenced by PDFView until its next
+        // SwiftUI update. Keeping the file briefly avoids a deleted-file race.
     }
 
     func newFromTemplate() {
@@ -350,9 +360,13 @@ final class EditorViewModel {
                 self.lastBuildLog = output.log
                 self.lastBuildLogFile = output.logFileURL
                 self.lastCompilationDuration = output.duration
-                if let pdf = PDFDocument(data: output.pdfData) {
+                if let pdf = PDFDocument(url: output.pdfFileURL) {
                     self.pdfDocument = pdf
+                    self.pdfCacheURL = output.pdfFileURL
+                    // The previous cache file is retained until PDFCache.prune
+                    // keeps the newest 3, avoiding a race with the old PDFView.
                 } else {
+                    PDFCache.remove(output.pdfFileURL)
                     self.errorMessage = "Failed to load generated PDF."
                 }
             case .failure(let error):

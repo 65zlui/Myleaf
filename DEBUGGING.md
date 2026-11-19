@@ -2,7 +2,7 @@
 
 > 时间：2026-11-18 ~ 2026-11-19
 > 仓库：`git@github.com:65zlui/Myleaf.git`（`main`）
-> 对应版本：v1.3.0
+> 对应版本：v1.4.0
 >
 > 本文记录的是**定位问题、修改代码、验证修复**的过程，而不是应用运行时的操作日志。
 > 应用运行时的编译日志见下文第 5 节（功能实现）以及 `~/Library/Logs/myleaf/`。
@@ -313,7 +313,7 @@ xattr -lr build/Build/Products/Release/myleaf.app
 **验证**
 
 ```text
-myleaf-1.3.dmg: valid on disk / satisfies its Designated Requirement
+myleaf-1.4.dmg: valid on disk / satisfies its Designated Requirement
 Signature=adhoc, Format=universal (x86_64 arm64), Runtime Version=15.5.0
 ```
 
@@ -424,7 +424,7 @@ ItarBundle::ensure_index
 3. 版本比较支持 `0.17.0 > 0.16.9`、`1.0.10 > 1.0.9`，缺失版本排在最后。
 4. Build Log 增加：
    - `Engine version: 0.17.0`
-   - `--- timings ---`：Preparation / Engine run / PDF read / Total
+   - `--- timings ---`：Preparation / Engine run / PDF cache / Total
 
 **验证**
 
@@ -466,17 +466,17 @@ prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
 
 `pkgbuild` 生成三个本地包，对应三种路径：
 
-1. **`myleaf-1.3.pkg`**（完整安装）
+1. **`myleaf-1.4.pkg`**（完整安装）
    - 用 `--root` 构造 payload：`Applications/myleaf.app`，安装位置 `/`。
    - `preinstall` 先 `pkill -x myleaf`，避免覆盖正在运行的应用。
    - 验证方式：`pkgutil --expand-full` 解开 payload，确认 `codesign --verify`
      仍通过（payload 里的 app 签名有效）。
-2. **`myleaf-uninstaller-1.3.pkg`**（完整卸载）
+2. **`myleaf-uninstaller-1.4.pkg`**（完整卸载）
    - `pkgbuild --nopayload`，只用 `preinstall` 执行清理。
    - 删除 `/Applications/myleaf.app`、应用管理的 Tectonic/Pandoc、编译日志、
      Tectonic 缓存、应用缓存、偏好设置、窗口状态、旧沙盒容器。
    - 保留用户 `.tex` 项目和系统安装的 TeX/Pandoc。
-3. **`myleaf-uninstaller-keepdata-1.3.pkg`**（卸载但保留数据）
+3. **`myleaf-uninstaller-keepdata-1.4.pkg`**（卸载但保留数据）
    - 只删除 `/Applications/myleaf.app`。
    - 保留 `Application Support/myleaf`（工具）、`Logs/myleaf`（编译日志）、
      偏好设置/最近项目、Tectonic 缓存等，重新安装后可恢复原状态。
@@ -532,7 +532,7 @@ Exit status: 0
 --- timings ---
 Preparation: 0.002s
 Engine run: 0.333s
-PDF read: 0.000s
+PDF cache: 0.000s
 Total: 0.335s
 Finished: 2026-11-19 00:12:31.539
 ```
@@ -569,6 +569,47 @@ Finished: 2026-11-19 00:12:31.539
   - `~/Library/Logs/myleaf/memory-20261119.jsonl` 正常写入
 - 现有 51 个测试全部通过
 
+### 5.3 内存占用优化（v1.4）
+
+**测量**
+
+对运行中的 Release 构建使用 `footprint -p`、`vmmap -summary`：
+
+```text
+Physical footprint: 69 MB（峰值 113 MB）
+IOSurface          28.2 MB
+MALLOC_SMALL        8.9 MB
+MALLOC_NANO         8.2 MB
+MALLOC_MEDIUM       6.0 MB
+MALLOC_TINY         4.1 MB
+__DATA              4.2 MB
+CoreUI image data   2.3 MB
+```
+
+结论：空闲内存主要是 AppKit/SwiftUI/窗口图层（IOSurface）与 malloc 区域，
+应用自身可优化的空间主要在大文档/大 PDF 的峰值，而不是空闲基线。
+
+**改动**
+
+1. **PDF 改为文件缓存**
+   - 编译成功后把 PDF 移入 `~/Library/Caches/myleaf/pdfs`（最多保留 3 份）
+   - 用 `PDFDocument(url:)` 打开，不再把整份 PDF 读成 `Data` 常驻内存
+   - 新预览加载后删除上一份缓存文件；新建/打开/换模板时也清理
+2. **限制撤销栈**
+   - `NSTextView` 默认撤销历史无上限，会保留大量全文快照
+   - 在 `viewDidMoveToWindow` 中设置 `undoManager?.levelsOfUndo = 100`
+
+**验证**
+
+- harness：编译产物落到 `~/Library/Caches/myleaf/pdfs/preview-*.pdf`，
+  `pdfByteCount` 正确，缓存文件可被 `PDFDocument` 打开
+- 51 个测试全部通过
+- 输出日志的 timings 阶段由 “PDF read” 改为 “PDF cache”（包含落盘时间）
+
+> 说明：这两项主要降低大 PDF/长文档的峰值与长期增长；空闲 69 MB 中约 28 MB
+> 是窗口 IOSurface，应用代码无法显著压缩。若需要进一步降低空闲内存，只能考虑
+> 缩小窗口/减少图层，或改为更轻的原生 UI 架构。
+
 ---
 
 ## 6. 验证矩阵
@@ -586,6 +627,9 @@ Finished: 2026-11-19 00:12:31.539
 | 测试耗时 | 51 个测试 | 4.3s（修复前约 19s） |
 | 内存采样 | 运行 Debug 构建 + `footprint -p` | 23 MB vs 22 MB，一致 |
 | 内存日志 | 查看 `~/Library/Logs/myleaf/memory-*.jsonl` | 启动 10s 后写入，之后每分钟一条 |
+| PDF 文件缓存 | harness 编译 + 检查 `~/Library/Caches/myleaf/pdfs` | 生成 preview-*.pdf，大小正确，可被 PDFKit 打开 |
+| 撤销栈上限 | 代码审查 + 编辑器实际使用 | `levelsOfUndo = 100` |
+| 空闲内存构成 | `footprint -p` + `vmmap -summary` | 69 MB：IOSurface 28 MB、malloc 27 MB、框架/资源 14 MB |
 | Release 启动 | `open` + `pgrep` + 截图 | 正常，AntiDebug 未误杀 |
 | DMG 签名 | `codesign --verify --deep --strict` | 通过 |
 | DMG 启动 | 挂载后运行 | 正常 |
@@ -614,8 +658,9 @@ Finished: 2026-11-19 00:12:31.539
 | v1.1 提交 | 运行时编译日志、窗口状态恢复修复、pkg 安装/卸载包、本调试记录 |
 | v1.2 提交 | 引擎版本探测/最新版选择 + Build Log 阶段耗时 |
 | v1.3 提交 | 内存占用监控（task_info 采样 + JSONL 日志 + 设置页 Diagnostics） |
+| v1.4 提交 | PDF 文件缓存 + 撤销栈上限（降低大文档/大 PDF 峰值） |
 
-标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）。
+标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）→ `v1.4.0`（内存优化）。
 
 ---
 

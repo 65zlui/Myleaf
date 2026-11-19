@@ -121,7 +121,9 @@ enum CompilerStatus: Equatable {
 /// The artifacts of a successful compilation. The PDF is kept in memory so
 /// temporary files can be removed as soon as compilation finishes.
 struct CompilationOutput {
-    let pdfData: Data
+    /// File-backed PDF in ~/Library/Caches/myleaf/pdfs.
+    let pdfFileURL: URL
+    let pdfByteCount: Int
     let log: String
     let logFileURL: URL?
     let duration: TimeInterval
@@ -402,26 +404,29 @@ final class LaTeXCompiler {
         let engineDuration = Date().timeIntervalSince(engineStart)
         let engineLog = readLog(at: engineLogURL)
 
-        // Read the PDF before building the log so its time is measured too.
-        var pdfData: Data?
-        var pdfLoad: TimeInterval = 0
+        // Move the PDF into a persistent cache before building the log so its
+        // time is measured and PDFKit can open it file-backed.
+        var pdfFileURL: URL?
+        var pdfByteCount = 0
+        var pdfCacheDuration: TimeInterval = 0
         if run.launchError == nil, !run.timedOut, (run.exitCode ?? -1) == 0 {
             // Tectonic names the output after the input file; pdflatex does the same.
             let pdfURL = outDir
                 .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
                 .appendingPathExtension("pdf")
-            let pdfStart = Date()
-            if let data = try? Data(contentsOf: pdfURL), !data.isEmpty {
-                pdfData = data
+            let cacheStart = Date()
+            if let cached = PDFCache.store(pdfURL), PDFCache.byteCount(of: cached) > 0 {
+                pdfFileURL = cached
+                pdfByteCount = PDFCache.byteCount(of: cached)
             }
-            pdfLoad = Date().timeIntervalSince(pdfStart)
+            pdfCacheDuration = Date().timeIntervalSince(cacheStart)
         }
 
         let total = Date().timeIntervalSince(startedAt)
         let timings = CompilationTimings(
             preparation: preparation,
             engine: engineDuration,
-            pdfLoad: pdfLoad,
+            pdfLoad: pdfCacheDuration,
             total: total
         )
 
@@ -457,14 +462,15 @@ final class LaTeXCompiler {
             return .failure(.compilationFailed(log: buildLog, logFile: savedLogURL))
         }
 
-        guard let data = pdfData else {
+        guard let pdfFileURL else {
             buildLogger.error("Engine exited successfully but produced no PDF")
             return .failure(.outputNotFound(log: buildLog, logFile: savedLogURL))
         }
 
         buildLogger.info("Compilation succeeded in \(timings.total, format: .fixed(precision: 2)) s (engine \(timings.engine, format: .fixed(precision: 2)) s)")
         return .success(CompilationOutput(
-            pdfData: data,
+            pdfFileURL: pdfFileURL,
+            pdfByteCount: pdfByteCount,
             log: buildLog,
             logFileURL: savedLogURL,
             duration: timings.total,
@@ -516,7 +522,7 @@ final class LaTeXCompiler {
         lines.append("--- timings ---")
         lines.append("Preparation: \(Self.seconds(timings.preparation))s")
         lines.append("Engine run: \(Self.seconds(timings.engine))s")
-        lines.append("PDF read: \(Self.seconds(timings.pdfLoad))s")
+        lines.append("PDF cache: \(Self.seconds(timings.pdfLoad))s")
         lines.append("Total: \(Self.seconds(timings.total))s")
         lines.append("Finished: \(Self.logTimestamp(Date()))")
         lines.append("")

@@ -26,8 +26,10 @@ struct LaTeXCompilerTests {
         let result = await compiler.compile(source: source)
         switch result {
         case .success(let output):
-            #expect(output.pdfData.count > 0)
-            #expect(output.pdfData.prefix(4) == Data("%PDF".utf8))
+            let pdfData = try Data(contentsOf: output.pdfFileURL)
+            #expect(pdfData.count > 0)
+            #expect(pdfData.prefix(4) == Data("%PDF".utf8))
+            #expect(output.pdfByteCount > 0)
             #expect(output.log.contains("myleaf build log"))
             #expect(output.log.contains("Exit status: 0"))
             #expect(output.log.contains("Engine: Tectonic") || output.log.contains("Engine: pdflatex"))
@@ -42,6 +44,7 @@ struct LaTeXCompilerTests {
                 #expect(FileManager.default.fileExists(atPath: logURL.path))
                 try? FileManager.default.removeItem(at: logURL)
             }
+            PDFCache.remove(output.pdfFileURL)
         case .failure(let error):
             Issue.record("Expected success, got \(error.localizedDescription)")
         }
@@ -73,7 +76,9 @@ struct LaTeXCompilerTests {
         let result = await compiler.compile(source: source, documentURL: mainFile)
         switch result {
         case .success(let output):
-            #expect(output.pdfData.count > 0)
+            let pdfData = try Data(contentsOf: output.pdfFileURL)
+            #expect(pdfData.count > 0)
+            PDFCache.remove(output.pdfFileURL)
         case .failure(let error):
             Issue.record("Expected success, got \(error.localizedDescription)")
         }
@@ -178,6 +183,10 @@ struct EditorViewModelCompileTests {
         #expect(viewModel.pdfDocument != nil)
         #expect(viewModel.lastBuildLog?.isEmpty == false)
         #expect(viewModel.lastCompilationDuration != nil)
+        if let pdfURL = viewModel.pdfCacheURL {
+            #expect(FileManager.default.fileExists(atPath: pdfURL.path))
+        }
+        PDFCache.remove(viewModel.pdfCacheURL)
 
         if let logURL = viewModel.lastBuildLogFile {
             #expect(FileManager.default.fileExists(atPath: logURL.path))

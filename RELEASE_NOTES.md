@@ -1,4 +1,4 @@
-# myleaf 1.3.0
+# myleaf 1.4.0
 
 A native macOS LaTeX editor for academic writing — now with a hardened,
 project-aware compilation pipeline, build logs with phase timings, automatic
@@ -24,7 +24,7 @@ and a proper app icon.
   a bundle-index HTTP check even for a one-line document, while **0.17.0**
   completed the same warm compile in 0.20–0.37 s. The app previously preferred
   an older app-installed build over a newer system build.
-- Compile wall time is broken down into preparation, engine run, PDF read, and
+- Compile wall time is broken down into preparation, engine run, PDF cache, and
   total, so regressions are visible at a glance.
 - Measured result: a tiny warm document went from ~5–7 s to **~0.33 s**, and
   the 50-test suite dropped from ~19 s to **~2.9 s**.
@@ -50,6 +50,18 @@ and a proper app icon.
 - The previous automatic `leaks` CLI loop (which suspended the process every
   minute) has been removed; memory monitoring is now lightweight and also
   available in Release builds.
+
+### Memory optimizations
+- PDF previews are now file-backed: each compile is moved to
+  `~/Library/Caches/myleaf/pdfs` (max 3 files) and opened with
+  `PDFDocument(url:)` instead of retaining a full `Data` copy. The previous
+  preview file is removed when a new one is shown.
+- The editor's undo history is capped at 100 levels; NSTextView's default is
+  unlimited, which retains many full snapshots while editing large documents.
+- Profiling with `footprint`/`vmmap` shows the idle process at ~69 MB:
+  ~28 MB IOSurface (window/layer buffers), ~27 MB malloc zones, and ~14 MB
+  frameworks/assets. Idle memory is therefore close to the AppKit/SwiftUI
+  floor; the largest controllable wins are large-PDF and long-editing peaks.
 
 ### Editor
 - Syntax highlighting now gives comments the final word, ignores escaped `%`,
@@ -91,10 +103,10 @@ and a proper app icon.
 
 Choose one:
 
-- **Installer package (recommended):** double-click `myleaf-1.3.pkg` and follow
+- **Installer package (recommended):** double-click `myleaf-1.4.pkg` and follow
   the Installer. myleaf is installed to `/Applications`.
-- **DMG:** open `myleaf-1.3.dmg` and drag **myleaf** into **Applications**.
-- **ZIP:** unzip `myleaf-1.3.zip` and move **myleaf** to **Applications**.
+- **DMG:** open `myleaf-1.4.dmg` and drag **myleaf** into **Applications**.
+- **ZIP:** unzip `myleaf-1.4.zip` and move **myleaf** to **Applications**.
 
 First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
 or run:
@@ -108,7 +120,7 @@ click.
 
 ## Uninstall
 
-**Full uninstall** — double-click `myleaf-uninstaller-1.3.pkg` (DMG:
+**Full uninstall** — double-click `myleaf-uninstaller-1.4.pkg` (DMG:
 `Uninstall myleaf.pkg`). It quits myleaf and removes:
 
 - `/Applications/myleaf.app`
@@ -118,7 +130,7 @@ click.
   container
 
 **Uninstall but keep data** — double-click
-`myleaf-uninstaller-keepdata-1.3.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
+`myleaf-uninstaller-keepdata-1.4.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
 It removes only `/Applications/myleaf.app`; tools, build logs, preferences,
 recent-project history, and caches remain so a later install restores your
 setup.

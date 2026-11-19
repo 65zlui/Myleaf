@@ -183,6 +183,14 @@ class LaTeXTextView: NSTextView {
         appearanceDidChange?()
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // NSTextView keeps an unlimited undo history by default, which retains
+        // many full snapshots of large documents. 100 levels is plenty for an
+        // editor while bounding memory growth.
+        undoManager?.levelsOfUndo = 100
+    }
+
     override var isAutomaticQuoteSubstitutionEnabled: Bool {
         get { false }
         set { }

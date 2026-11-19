@@ -19,12 +19,13 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 
 ### LaTeX Editor
 - **Syntax highlighting**: Color-coded tokens for comments, commands, environments, math mode, and braces with dark/light mode support
-- **Native editing experience**: NSTextView-based with undo/redo, auto-indent, monospaced font
+- **Native editing experience**: NSTextView-based with undo/redo, auto-indent, monospaced font; undo history is capped at 100 levels to bound memory on large documents
 - **Smart paste**: Automatically strips rich text formatting on paste, with instant syntax highlighting
 
 ### PDF Preview
 - **Live preview**: PDFKit-powered rendering, displayed immediately after compilation
 - **Split-pane layout**: Draggable divider between editor and PDF preview
+- **File-backed PDFs**: Compiled PDFs are cached in `~/Library/Caches/myleaf/pdfs` (max 3 files) and opened by URL, avoiding a full in-memory `Data` copy for large documents
 
 ### LaTeX Compilation
 - **Multi-engine support**: Tectonic (preferred) with automatic fallback to pdflatex
@@ -76,9 +77,9 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 
 | # | Mode | Package | Effect |
 |---|------|---------|--------|
-| 1 | **Full install** | `myleaf-1.3.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
-| 2 | **Full uninstall** | `myleaf-uninstaller-1.3.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
-| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.3.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
+| 1 | **Full install** | `myleaf-1.4.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
+| 2 | **Full uninstall** | `myleaf-uninstaller-1.4.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
+| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.4.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
 
 ### Paths
 
@@ -90,6 +91,7 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 | Preferences, recent projects, auto-save | `~/Library/Preferences/com.65zlui.myleaf.plist` | removed | kept |
 | Tectonic package cache | `~/Library/Caches/Tectonic` | removed | kept |
 | App cache / HTTP storage | `~/Library/Caches/com.65zlui.myleaf`, `~/Library/HTTPStorages/com.65zlui.myleaf` | removed | kept |
+| PDF preview cache | `~/Library/Caches/myleaf/pdfs` | removed | kept |
 | Saved window state | `~/Library/Saved Application State/com.65zlui.myleaf.savedState` | removed | kept |
 | Legacy sandbox container | `~/Library/Containers/com.65zlui.myleaf` | removed | kept |
 
@@ -110,6 +112,7 @@ rm -rf ~/Library/Application\ Support/myleaf \
        ~/Library/Logs/myleaf \
        ~/Library/Caches/Tectonic \
        ~/Library/Caches/com.65zlui.myleaf \
+       ~/Library/Caches/myleaf \
        ~/Library/HTTPStorages/com.65zlui.myleaf \
        ~/Library/Preferences/com.65zlui.myleaf.plist \
        ~/Library/Saved\ Application\ State/com.65zlui.myleaf.savedState \
@@ -139,11 +142,11 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 
 Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
 
-- `dist/myleaf-1.3.pkg` — installer (installs to `/Applications`)
-- `dist/myleaf-uninstaller-1.3.pkg` — full uninstall (app + data)
-- `dist/myleaf-uninstaller-keepdata-1.3.pkg` — uninstall the app, keep user data
-- `dist/myleaf-1.3.dmg` — drag-to-Applications image (includes both uninstallers)
-- `dist/myleaf-1.3.zip`
+- `dist/myleaf-1.4.pkg` — installer (installs to `/Applications`)
+- `dist/myleaf-uninstaller-1.4.pkg` — full uninstall (app + data)
+- `dist/myleaf-uninstaller-keepdata-1.4.pkg` — uninstall the app, keep user data
+- `dist/myleaf-1.4.dmg` — drag-to-Applications image (includes both uninstallers)
+- `dist/myleaf-1.4.zip`
 - `dist/SHA256SUMS.txt`
 
 ---
