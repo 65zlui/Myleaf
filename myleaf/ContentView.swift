@@ -256,7 +256,7 @@ struct ContentView: View {
         case .ready(let engine):
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .help("\(engine.displayName) ready")
+                .help("\(engine.versionDescription) ready")
         case .notFound:
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.red)

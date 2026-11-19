@@ -32,10 +32,10 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 ### 🔧 LaTeX 编译
 - **多引擎支持**：Tectonic（首选）→ pdflatex 自动降级
 - **项目感知编译**：在文档所在目录编译，`\input`、图片和 `.bib` 引用均可正确解析
-- **自动检测**：启动时自动检测可用引擎并显示状态指示
+- **自动选择最新引擎**：逐个探测已安装的 Tectonic 版本（`--version`）并选用最新版；0.16.x 旧版可能每次启动都花数秒做 bundle index 网络检查
 - **一键安装**：应用内下载安装 Tectonic（从 GitHub Release 获取）
 - **可靠的进程处理**：日志写入文件（避免管道死锁），5 分钟超时自动终止
-- **编译日志**：每次编译都会记录引擎、命令、退出状态、耗时和完整输出到 `~/Library/Logs/myleaf`，可用 ⌘⇧L 在应用内查看
+- **编译日志含阶段耗时**：记录引擎版本、命令、完整输出、退出状态，以及准备 / 引擎运行 / PDF 读取 / 总耗时，位于 `~/Library/Logs/myleaf`，可用 ⌘⇧L 在应用内查看
 - **快捷键**：⌘B 一键编译
 
 ### 📦 模板系统
@@ -78,9 +78,9 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 | # | 方式 | 包 | 效果 |
 |---|------|-----|------|
-| 1 | **完整安装** | `myleaf-1.1.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
-| 2 | **完整卸载** | `myleaf-uninstaller-1.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
-| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+| 1 | **完整安装** | `myleaf-1.2.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-1.2.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.2.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
 ### 各路径与处理方式
 
@@ -141,11 +141,11 @@ open myleaf.xcodeproj
 
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
-- `dist/myleaf-1.1.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-1.1.pkg` —— 完整卸载（应用 + 数据）
-- `dist/myleaf-uninstaller-keepdata-1.1.pkg` —— 只卸载应用，保留用户数据
-- `dist/myleaf-1.1.dmg` —— 拖拽安装镜像（内含两个卸载包）
-- `dist/myleaf-1.1.zip`
+- `dist/myleaf-1.2.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-1.2.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-1.2.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-1.2.dmg` —— 拖拽安装镜像（内含两个卸载包）
+- `dist/myleaf-1.2.zip`
 - `dist/SHA256SUMS.txt`
 
 ---

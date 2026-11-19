@@ -52,23 +52,64 @@ enum CompilationError: LocalizedError {
     }
 }
 
-enum TeXEngine: Equatable {
-    case tectonic(URL)
-    case pdflatex(URL)
+struct TeXEngine: Equatable {
+    enum Kind: String {
+        case tectonic
+        case pdflatex
 
-    var displayName: String {
-        switch self {
-        case .tectonic: return "Tectonic"
-        case .pdflatex: return "pdflatex"
+        var displayName: String {
+            switch self {
+            case .tectonic: return "Tectonic"
+            case .pdflatex: return "pdflatex"
+            }
         }
     }
 
-    var path: String {
-        switch self {
-        case .tectonic(let url), .pdflatex(let url):
-            return url.path
-        }
+    let kind: Kind
+    let url: URL
+    /// Short version string, e.g. "0.17.0". Nil when the probe failed.
+    let version: String?
+
+    var displayName: String { kind.displayName }
+    var path: String { url.path }
+
+    var versionDescription: String {
+        if let version { return "\(displayName) \(version)" }
+        return displayName
     }
+
+    /// Numeric-aware version comparison. A missing version sorts below any known one.
+    static func compareVersions(_ lhs: String?, _ rhs: String?) -> ComparisonResult {
+        let left = versionComponents(lhs)
+        let right = versionComponents(rhs)
+
+        if left.isEmpty && right.isEmpty { return .orderedSame }
+        if left.isEmpty { return .orderedAscending }
+        if right.isEmpty { return .orderedDescending }
+
+        let count = max(left.count, right.count)
+        for index in 0..<count {
+            let a = index < left.count ? left[index] : 0
+            let b = index < right.count ? right[index] : 0
+            if a != b { return a < b ? .orderedAscending : .orderedDescending }
+        }
+        return .orderedSame
+    }
+
+    private static func versionComponents(_ version: String?) -> [Int] {
+        guard let version else { return [] }
+        return version
+            .split(whereSeparator: { !$0.isNumber })
+            .compactMap { Int($0) }
+    }
+}
+
+/// Per-phase wall-clock measurements for a single compile.
+struct CompilationTimings: Equatable {
+    var preparation: TimeInterval = 0
+    var engine: TimeInterval = 0
+    var pdfLoad: TimeInterval = 0
+    var total: TimeInterval = 0
 }
 
 enum CompilerStatus: Equatable {
@@ -84,6 +125,7 @@ struct CompilationOutput {
     let log: String
     let logFileURL: URL?
     let duration: TimeInterval
+    let timings: CompilationTimings
 }
 
 final class LaTeXCompiler {
@@ -104,59 +146,124 @@ final class LaTeXCompiler {
 
     // MARK: - Engine Detection
 
-    /// Detect available TeX engine. Priority: installed tectonic → system tectonic → system pdflatex
+    /// Detects available engines and selects the newest Tectonic build.
+    ///
+    /// Older Tectonic releases (e.g. 0.16.x) can spend several seconds on a
+    /// bundle-index network check even for tiny documents, while 0.17.x uses
+    /// the cache and starts in fractions of a second. Every Tectonic candidate
+    /// is therefore probed with `--version` and the highest version wins.
+    /// pdflatex is used only when no Tectonic is available.
     func detectEngine() -> TeXEngine? {
         let fm = FileManager.default
 
-        // 1. Check app-installed tectonic
-        if fm.isExecutableFile(atPath: installedTectonicPath.path) {
-            let e = TeXEngine.tectonic(installedTectonicPath)
-            engine = e
-            return e
-        }
-
-        // 2. Check system tectonic
-        let tectonicCandidates = [
+        var tectonicPaths = [
+            installedTectonicPath.path,
             "/opt/homebrew/bin/tectonic",
             "/usr/local/bin/tectonic"
         ]
-        for path in tectonicCandidates {
-            if fm.isExecutableFile(atPath: path) {
-                let e = TeXEngine.tectonic(URL(fileURLWithPath: path))
-                engine = e
-                return e
+
+        // Only pay for a login-shell lookup when none of the usual locations
+        // exist; this keeps launch-time detection fast.
+        if !tectonicPaths.contains(where: { fm.isExecutableFile(atPath: $0) }),
+           let which = runWhich("tectonic") {
+            tectonicPaths.append(which)
+        }
+
+        var seen = Set<String>()
+        var tectonicEngines: [TeXEngine] = []
+
+        for path in tectonicPaths {
+            let url = URL(fileURLWithPath: path)
+            guard fm.isExecutableFile(atPath: url.path) else { continue }
+            let key = url.resolvingSymlinksInPath().path
+            guard seen.insert(key).inserted else { continue }
+            tectonicEngines.append(TeXEngine(
+                kind: .tectonic,
+                url: url,
+                version: Self.queryVersion(at: url, kind: .tectonic)
+            ))
+        }
+
+        var best: TeXEngine?
+        for candidate in tectonicEngines {
+            guard let current = best else {
+                best = candidate
+                continue
+            }
+            if TeXEngine.compareVersions(candidate.version, current.version) == .orderedDescending {
+                best = candidate
             }
         }
 
-        // 3. Check system pdflatex
-        let pdflatexCandidates = [
+        if let best {
+            engine = best
+            return best
+        }
+
+        var pdflatexPaths = [
             "/Library/TeX/texbin/pdflatex",
             "/usr/local/bin/pdflatex",
             "/opt/homebrew/bin/pdflatex",
             "/usr/texbin/pdflatex"
         ]
-        for path in pdflatexCandidates {
-            if fm.isExecutableFile(atPath: path) {
-                let e = TeXEngine.pdflatex(URL(fileURLWithPath: path))
-                engine = e
-                return e
-            }
+        if !pdflatexPaths.contains(where: { fm.isExecutableFile(atPath: $0) }),
+           let which = runWhich("pdflatex") {
+            pdflatexPaths.append(which)
         }
 
-        // 4. Fallback: which
-        if let path = runWhich("tectonic") {
-            let e = TeXEngine.tectonic(URL(fileURLWithPath: path))
-            engine = e
-            return e
-        }
-        if let path = runWhich("pdflatex") {
-            let e = TeXEngine.pdflatex(URL(fileURLWithPath: path))
-            engine = e
-            return e
+        seen.removeAll()
+        for path in pdflatexPaths {
+            let url = URL(fileURLWithPath: path)
+            guard fm.isExecutableFile(atPath: url.path) else { continue }
+            let key = url.resolvingSymlinksInPath().path
+            guard seen.insert(key).inserted else { continue }
+            let selected = TeXEngine(
+                kind: .pdflatex,
+                url: url,
+                version: Self.queryVersion(at: url, kind: .pdflatex)
+            )
+            engine = selected
+            return selected
         }
 
         engine = nil
         return nil
+    }
+
+    // MARK: - Version Helpers
+
+    /// Runs `<engine> --version` and extracts a short, display-friendly version.
+    private static func queryVersion(at url: URL, kind: TeXEngine.Kind) -> String? {
+        let process = Process()
+        process.executableURL = url
+        process.arguments = ["--version"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return nil }
+
+            let firstLine = output
+                .split(whereSeparator: \.isNewline)
+                .first
+                .map(String.init)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let firstLine, !firstLine.isEmpty else { return nil }
+
+            if kind == .tectonic,
+               let range = firstLine.range(of: #"\d+\.\d+(?:\.\d+)?"#, options: .regularExpression) {
+                return String(firstLine[range])
+            }
+            return firstLine
+        } catch {
+            return nil
+        }
     }
 
     private func runWhich(_ command: String) -> String? {
@@ -200,7 +307,7 @@ final class LaTeXCompiler {
         }
 
         let startedAt = Date()
-        buildLogger.info("Compile started with \(engine.displayName, privacy: .public)")
+        buildLogger.info("Compile started with \(engine.versionDescription, privacy: .public)")
 
         let fm = FileManager.default
         let workDir = fm.temporaryDirectory
@@ -268,7 +375,7 @@ final class LaTeXCompiler {
 
         let workingDirectory = inputFile.deletingLastPathComponent()
         let arguments: [String]
-        switch engine {
+        switch engine.kind {
         case .tectonic:
             arguments = ["--outdir", outDir.path, "--keep-logs", inputFile.path]
         case .pdflatex:
@@ -280,22 +387,47 @@ final class LaTeXCompiler {
             ]
         }
 
+        let preparation = Date().timeIntervalSince(startedAt)
         let commandLine = ([engine.path] + arguments).map(Self.shellQuoted).joined(separator: " ")
-        buildLogger.info("Running: \(commandLine, privacy: .public)")
+        buildLogger.info("Running \(engine.versionDescription, privacy: .public): \(commandLine, privacy: .public)")
 
         let engineLogURL = workDir.appendingPathComponent("build.log")
+        let engineStart = Date()
         let run = await runProcess(
             executable: URL(fileURLWithPath: engine.path),
             arguments: arguments,
             workingDirectory: workingDirectory,
             logURL: engineLogURL
         )
-
-        let duration = Date().timeIntervalSince(startedAt)
+        let engineDuration = Date().timeIntervalSince(engineStart)
         let engineLog = readLog(at: engineLogURL)
+
+        // Read the PDF before building the log so its time is measured too.
+        var pdfData: Data?
+        var pdfLoad: TimeInterval = 0
+        if run.launchError == nil, !run.timedOut, (run.exitCode ?? -1) == 0 {
+            // Tectonic names the output after the input file; pdflatex does the same.
+            let pdfURL = outDir
+                .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
+                .appendingPathExtension("pdf")
+            let pdfStart = Date()
+            if let data = try? Data(contentsOf: pdfURL), !data.isEmpty {
+                pdfData = data
+            }
+            pdfLoad = Date().timeIntervalSince(pdfStart)
+        }
+
+        let total = Date().timeIntervalSince(startedAt)
+        let timings = CompilationTimings(
+            preparation: preparation,
+            engine: engineDuration,
+            pdfLoad: pdfLoad,
+            total: total
+        )
+
         let buildLog = makeBuildLog(
             startedAt: startedAt,
-            duration: duration,
+            timings: timings,
             engine: engine,
             inputFile: inputFile,
             workingDirectory: workingDirectory,
@@ -325,22 +457,18 @@ final class LaTeXCompiler {
             return .failure(.compilationFailed(log: buildLog, logFile: savedLogURL))
         }
 
-        // Tectonic names the output after the input file; pdflatex does the same.
-        let pdfURL = outDir
-            .appendingPathComponent(inputFile.deletingPathExtension().lastPathComponent)
-            .appendingPathExtension("pdf")
-
-        guard let data = try? Data(contentsOf: pdfURL), !data.isEmpty else {
+        guard let data = pdfData else {
             buildLogger.error("Engine exited successfully but produced no PDF")
             return .failure(.outputNotFound(log: buildLog, logFile: savedLogURL))
         }
 
-        buildLogger.info("Compilation succeeded in \(duration, format: .fixed(precision: 2)) s")
+        buildLogger.info("Compilation succeeded in \(timings.total, format: .fixed(precision: 2)) s (engine \(timings.engine, format: .fixed(precision: 2)) s)")
         return .success(CompilationOutput(
             pdfData: data,
             log: buildLog,
             logFileURL: savedLogURL,
-            duration: duration
+            duration: timings.total,
+            timings: timings
         ))
     }
 
@@ -348,7 +476,7 @@ final class LaTeXCompiler {
 
     private func makeBuildLog(
         startedAt: Date,
-        duration: TimeInterval,
+        timings: CompilationTimings,
         engine: TeXEngine,
         inputFile: URL,
         workingDirectory: URL,
@@ -363,6 +491,7 @@ final class LaTeXCompiler {
             "================",
             "Started: \(Self.logTimestamp(startedAt))",
             "Engine: \(engine.displayName)",
+            "Engine version: \(engine.version ?? "unknown")",
             "Engine path: \(engine.path)",
             "Input: \(inputFile.path)",
             "Working directory: \(workingDirectory.path)",
@@ -383,11 +512,20 @@ final class LaTeXCompiler {
             lines.append("Exit status: \(run.exitCode ?? -1)")
         }
 
-        lines.append("Duration: \(String(format: "%.2f", duration))s")
+        lines.append("")
+        lines.append("--- timings ---")
+        lines.append("Preparation: \(Self.seconds(timings.preparation))s")
+        lines.append("Engine run: \(Self.seconds(timings.engine))s")
+        lines.append("PDF read: \(Self.seconds(timings.pdfLoad))s")
+        lines.append("Total: \(Self.seconds(timings.total))s")
         lines.append("Finished: \(Self.logTimestamp(Date()))")
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func seconds(_ value: TimeInterval) -> String {
+        String(format: "%.3f", value)
     }
 
     private static func shellQuoted(_ value: String) -> String {

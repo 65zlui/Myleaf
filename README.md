@@ -29,10 +29,10 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 ### LaTeX Compilation
 - **Multi-engine support**: Tectonic (preferred) with automatic fallback to pdflatex
 - **Project-aware**: Compiles in the document's folder, so `\input`, `\includegraphics`, and `.bib` references resolve correctly
-- **Auto-detection**: Detects available engines on launch with status indicator
+- **Newest-engine selection**: Probes every installed Tectonic build (`--version`) and uses the newest one; older 0.16.x releases can spend seconds on bundle-index network checks before doing any work
 - **One-click install**: In-app Tectonic download and installation from GitHub Releases
 - **Reliable process handling**: Logs are captured to files (no pipe deadlocks) and a 5-minute timeout stops runaway builds
-- **Build logs**: Every compile is recorded (engine, command, exit status, duration, full engine output) under `~/Library/Logs/myleaf`, viewable in-app with Cmd+Shift+L
+- **Build logs with phase timings**: Every compile records engine version, command, full output, exit status, and preparation / engine-run / PDF-read / total wall time under `~/Library/Logs/myleaf`, viewable in-app with Cmd+Shift+L
 - **Shortcut**: Cmd+B to compile
 
 ### Template System
@@ -75,9 +75,9 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 
 | # | Mode | Package | Effect |
 |---|------|---------|--------|
-| 1 | **Full install** | `myleaf-1.1.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
-| 2 | **Full uninstall** | `myleaf-uninstaller-1.1.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
-| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
+| 1 | **Full install** | `myleaf-1.2.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
+| 2 | **Full uninstall** | `myleaf-uninstaller-1.2.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
+| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.2.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
 
 ### Paths
 
@@ -138,11 +138,11 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 
 Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
 
-- `dist/myleaf-1.1.pkg` — installer (installs to `/Applications`)
-- `dist/myleaf-uninstaller-1.1.pkg` — full uninstall (app + data)
-- `dist/myleaf-uninstaller-keepdata-1.1.pkg` — uninstall the app, keep user data
-- `dist/myleaf-1.1.dmg` — drag-to-Applications image (includes both uninstallers)
-- `dist/myleaf-1.1.zip`
+- `dist/myleaf-1.2.pkg` — installer (installs to `/Applications`)
+- `dist/myleaf-uninstaller-1.2.pkg` — full uninstall (app + data)
+- `dist/myleaf-uninstaller-keepdata-1.2.pkg` — uninstall the app, keep user data
+- `dist/myleaf-1.2.dmg` — drag-to-Applications image (includes both uninstallers)
+- `dist/myleaf-1.2.zip`
 - `dist/SHA256SUMS.txt`
 
 ---

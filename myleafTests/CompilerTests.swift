@@ -31,6 +31,12 @@ struct LaTeXCompilerTests {
             #expect(output.log.contains("myleaf build log"))
             #expect(output.log.contains("Exit status: 0"))
             #expect(output.log.contains("Engine: Tectonic") || output.log.contains("Engine: pdflatex"))
+            #expect(output.log.contains("Engine version:"))
+            #expect(output.log.contains("--- timings ---"))
+            #expect(output.log.contains("Engine run:"))
+            #expect(output.timings.total >= output.timings.engine)
+            #expect(output.timings.engine > 0)
+            #expect(output.duration == output.timings.total)
             #expect(output.logFileURL != nil)
             if let logURL = output.logFileURL {
                 #expect(FileManager.default.fileExists(atPath: logURL.path))
@@ -98,11 +104,32 @@ struct LaTeXCompilerTests {
             }
             #expect(error.errorDescription?.isEmpty == false)
             #expect(error.buildLog?.contains("Exit status") == true)
+            #expect(error.buildLog?.contains("--- timings ---") == true)
             if let logURL = error.buildLogFile {
                 #expect(FileManager.default.fileExists(atPath: logURL.path))
                 try? FileManager.default.removeItem(at: logURL)
             }
         }
+    }
+}
+
+@Suite(.serialized)
+struct TexEngineVersionTests {
+
+    @Test func newerPatchWins() {
+        #expect(TeXEngine.compareVersions("0.17.0", "0.16.9") == .orderedDescending)
+        #expect(TeXEngine.compareVersions("1.0.10", "1.0.9") == .orderedDescending)
+        #expect(TeXEngine.compareVersions("1.0", "1.0.0") == .orderedSame)
+        #expect(TeXEngine.compareVersions(nil, "0.1.0") == .orderedAscending)
+        #expect(TeXEngine.compareVersions("0.1.0", nil) == .orderedDescending)
+        #expect(TeXEngine.compareVersions(nil, nil) == .orderedSame)
+    }
+
+    @Test func detectionReportsVersion() {
+        let compiler = LaTeXCompiler()
+        guard let engine = compiler.detectEngine() else { return }
+        #expect(engine.version?.isEmpty == false)
+        #expect(engine.url.isFileURL)
     }
 }
 

@@ -2,7 +2,7 @@
 
 > 时间：2026-11-18 ~ 2026-11-19
 > 仓库：`git@github.com:65zlui/Myleaf.git`（`main`）
-> 对应版本：v1.1.0
+> 对应版本：v1.2.0
 >
 > 本文记录的是**定位问题、修改代码、验证修复**的过程，而不是应用运行时的操作日志。
 > 应用运行时的编译日志见下文第 6 节（功能实现）以及 `~/Library/Logs/myleaf/`。
@@ -313,7 +313,7 @@ xattr -lr build/Build/Products/Release/myleaf.app
 **验证**
 
 ```text
-myleaf-1.1.dmg: valid on disk / satisfies its Designated Requirement
+myleaf-1.2.dmg: valid on disk / satisfies its Designated Requirement
 Signature=adhoc, Format=universal (x86_64 arm64), Runtime Version=15.5.0
 ```
 
@@ -385,6 +385,66 @@ func applicationShouldRestoreSecureApplicationState(_ app: NSApplication) -> Boo
 
 ---
 
+### 3.14 编译等待 6 秒：不是排版慢，是引擎版本旧
+
+**现象**
+
+```bash
+/usr/bin/time -p tectonic --outdir out tiny.tex
+# real 5.34–6.94s, user 0.24–0.26s
+```
+
+CPU 只用了 0.25 秒，wall time 却是 5–7 秒。同机 Homebrew Tectonic 0.17.0
+编译同一文档只要 **0.20s**。
+
+**定位**
+
+用 `sample <pid> 1 1` 抓取运行栈，时间全部耗在：
+
+```text
+ItarBundle::ensure_index
+  → BundleCache::new
+    → reqwest::blocking ... send
+      → semaphore_wait
+```
+
+即 Tectonic 0.16.9 每次启动都在做 bundle index 的 HTTP 检查，
+`--only-cached` 也挡不住；0.17.0 使用缓存索引，不再有这段等待。
+
+而应用的 `detectEngine()` 按“应用内安装 → Homebrew → /usr/local”的顺序
+直接返回第一个可执行文件，因此明明系统里有 0.17.0，却一直使用应用内安装的
+0.16.9。
+
+**修复**
+
+1. `TeXEngine` 从 enum 改为 struct：`kind + url + version`。
+2. `detectEngine()` 收集所有候选路径（应用内、Homebrew、`/usr/local`，
+   必要时 `which`），逐个执行 `--version`，按语义版本选最新者；
+   只有完全没有 Tectonic 时才使用 pdflatex。
+3. 版本比较支持 `0.17.0 > 0.16.9`、`1.0.10 > 1.0.9`，缺失版本排在最后。
+4. Build Log 增加：
+   - `Engine version: 0.17.0`
+   - `--- timings ---`：Preparation / Engine run / PDF read / Total
+
+**验证**
+
+独立 harness：
+
+```text
+Selected engine: Tectonic 0.17.0
+Path: /opt/homebrew/bin/tectonic
+wall: 0.338s
+prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
+```
+
+测试套件 50 个测试从约 19 秒降到 **2.85 秒**，说明每次编译都走了 0.17 的
+快速路径。Build Log 中可直接看到各阶段耗时。
+
+> 后续可选项：在设置页显示“当前使用的引擎/版本”，并为应用内旧版
+> Tectonic 提供“检查更新”按钮；对只有 0.16.x 的用户，升级后同样受益。
+
+---
+
 ## 4. 发布构建与打包
 
 `scripts/package-app.sh` 固化整个流程：
@@ -406,17 +466,17 @@ func applicationShouldRestoreSecureApplicationState(_ app: NSApplication) -> Boo
 
 `pkgbuild` 生成三个本地包，对应三种路径：
 
-1. **`myleaf-1.1.pkg`**（完整安装）
+1. **`myleaf-1.2.pkg`**（完整安装）
    - 用 `--root` 构造 payload：`Applications/myleaf.app`，安装位置 `/`。
    - `preinstall` 先 `pkill -x myleaf`，避免覆盖正在运行的应用。
    - 验证方式：`pkgutil --expand-full` 解开 payload，确认 `codesign --verify`
      仍通过（payload 里的 app 签名有效）。
-2. **`myleaf-uninstaller-1.1.pkg`**（完整卸载）
+2. **`myleaf-uninstaller-1.2.pkg`**（完整卸载）
    - `pkgbuild --nopayload`，只用 `preinstall` 执行清理。
    - 删除 `/Applications/myleaf.app`、应用管理的 Tectonic/Pandoc、编译日志、
      Tectonic 缓存、应用缓存、偏好设置、窗口状态、旧沙盒容器。
    - 保留用户 `.tex` 项目和系统安装的 TeX/Pandoc。
-3. **`myleaf-uninstaller-keepdata-1.1.pkg`**（卸载但保留数据）
+3. **`myleaf-uninstaller-keepdata-1.2.pkg`**（卸载但保留数据）
    - 只删除 `/Applications/myleaf.app`。
    - 保留 `Application Support/myleaf`（工具）、`Logs/myleaf`（编译日志）、
      偏好设置/最近项目、Tectonic 缓存等，重新安装后可恢复原状态。
@@ -442,7 +502,7 @@ func applicationShouldRestoreSecureApplicationState(_ app: NSApplication) -> Boo
 | 位置 | 作用 |
 |------|------|
 | `Utils/BuildLogStore.swift` | 将每次构建日志写入 `~/Library/Logs/myleaf/build-YYYYMMDD-HHmmss-SSS.log`，保留最近 30 份 |
-| `Services/LaTeXCompiler.swift` | 日志包含开始时间、引擎与路径、输入文件、工作目录、完整命令行、超时、引擎输出、退出码、耗时；失败时日志随 `CompilationError` 返回 |
+| `Services/LaTeXCompiler.swift` | 日志包含开始时间、引擎与版本/路径、输入文件、工作目录、完整命令行、超时、引擎输出、退出码、分阶段耗时；失败时日志随 `CompilationError` 返回 |
 | `ViewModels/EditorViewModel.swift` | 保存 `lastBuildLog` / `lastBuildLogFile` / 耗时；编译阶段文案（检测引擎 → 运行引擎 → 加载 PDF） |
 | `Views/BuildLogView.swift` | 等宽字体日志面板，支持复制、在 Finder 中显示、打开日志目录 |
 | `ContentView.swift` / `myleafApp.swift` | 工具栏按钮、错误面板 “Show Log”、Build 菜单 ⌘⇧L |
@@ -455,6 +515,7 @@ myleaf build log
 ================
 Started: 2026-11-19 00:12:31.204
 Engine: Tectonic
+Engine version: 0.17.0
 Engine path: /opt/homebrew/bin/tectonic
 Input: /path/to/project/main.tex
 Working directory: /path/to/project
@@ -467,8 +528,13 @@ note: Running TeX ...
 
 --- result ---
 Exit status: 0
-Duration: 1.84s
-Finished: 2026-11-19 00:12:33.041
+
+--- timings ---
+Preparation: 0.002s
+Engine run: 0.333s
+PDF read: 0.000s
+Total: 0.335s
+Finished: 2026-11-19 00:12:31.539
 ```
 
 ### 验证
@@ -488,18 +554,22 @@ Finished: 2026-11-19 00:12:33.041
 | 编译成功路径 | 测试 + harness | 生成有效 `%PDF` 数据 |
 | 编译失败路径 | 测试 + harness | 返回日志、退出码、日志文件 |
 | 相对路径 | harness `\input{section.tex}` | 修复前失败、修复后成功 |
+| 引擎版本选择 | harness `detectEngine()` | 选中 Tectonic 0.17.0（而非应用内 0.16.9） |
+| 阶段耗时 | Build Log + 测试断言 | preparation / engine / pdf / total 均有值 |
+| 编译耗时 | harness | 0.335s（修复前 5–7s） |
+| 测试耗时 | 50 个测试 | 2.85s（修复前约 19s） |
 | Release 启动 | `open` + `pgrep` + 截图 | 正常，AntiDebug 未误杀 |
 | DMG 签名 | `codesign --verify --deep --strict` | 通过 |
 | DMG 启动 | 挂载后运行 | 正常 |
 | 安装包 payload | `pkgutil --expand-full` + `codesign --verify` | 通过，payload 内 app 签名有效 |
-| 安装包元数据 | 查看 `PackageInfo` | `com.65zlui.myleaf`，1.1，min OS 14.0，含 preinstall |
+| 安装包元数据 | 查看 `PackageInfo` | `com.65zlui.myleaf`，1.2，min OS 14.0，含 preinstall |
 | 卸载包结构 | `pkgutil --expand-full` | 两个包均无 payload，preinstall 可执行 |
 | 完整卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用与数据目录被删除，退出码 0 |
 | 保留数据卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用被删除，工具/日志/偏好保留 |
 | DMG 内容 | `hdiutil attach` | app + Applications 链接 + 两个卸载包 |
 | 应用图标 | 构建产物 `AppIcon.icns` + 截图 | 已生效 |
 
-测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）。
+测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）→ 50（引擎版本比较与阶段耗时断言）。
 
 ---
 
@@ -513,9 +583,10 @@ Finished: 2026-11-19 00:12:33.041
 | `e36d022` | App 图标、打包脚本、macOS 14 支持、发布文档 |
 | `695ac89` | MIT LICENSE |
 | `fe188d3` | 打包 `.app` 副本的 FileProvider 元数据清理 |
-| 本次提交 | 运行时编译日志、窗口状态恢复修复、pkg 安装/卸载包、本调试记录 |
+| v1.1 提交 | 运行时编译日志、窗口状态恢复修复、pkg 安装/卸载包、本调试记录 |
+| v1.2 提交 | 引擎版本探测/最新版选择 + Build Log 阶段耗时 |
 
-标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）。
+标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）。
 
 ---
 
@@ -526,3 +597,5 @@ Finished: 2026-11-19 00:12:33.041
 - **Word 导出**：Pandoc 安装流程未做端到端验证（本机未安装 Pandoc）。
 - **超大文档高亮**：每次按键仍会对全文做正则高亮；对数千行文档可能可感知延迟，后续可按可视区域/编辑行做增量高亮。
 - **UI 自动化**：当前机器未授予辅助功能权限，XCUITest 无法交互；已用 ViewModel 集成测试替代。
+- **旧版引擎升级**：当前只会选择“已安装的最新版”；如果机器上只有应用内 0.16.x，编译仍会慢。后续可在设置页增加“检查 Tectonic 更新”按钮。
+- **监控深化**：本次只把阶段耗时写入 Build Log；OSSignposter 时间线与 JSONL 指标尚未接入，适合作为下一阶段。
