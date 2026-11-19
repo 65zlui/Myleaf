@@ -59,7 +59,8 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 
 ### Security & Diagnostics
 - **Release hardening**: Hardened Runtime, symbol stripping, anti-debug protection (ptrace)
-- **Memory diagnostics**: Live physical footprint and peak in Settings (sampled every 2 s via `task_info`); one sample per minute is written to `~/Library/Logs/myleaf/memory-*.jsonl` (last 7 days kept)
+- **Performance panel**: Settings → Performance shows a live physical-footprint chart (1/5/15/30 min), current/peak/resident counters, and per-compile phase timings (preparation / engine / PDF cache) with the recent build list
+- **Memory diagnostics**: Live physical footprint and peak (sampled every 2 s via `task_info`); one sample per minute is written to `~/Library/Logs/myleaf/memory-*.jsonl` (last 7 days kept)
 - **Debug logging**: deinit tracing for views, coordinators, and the view model
 
 ---
@@ -77,9 +78,9 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 
 | # | Mode | Package | Effect |
 |---|------|---------|--------|
-| 1 | **Full install** | `myleaf-1.4.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
-| 2 | **Full uninstall** | `myleaf-uninstaller-1.4.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
-| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.4.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
+| 1 | **Full install** | `myleaf-1.5.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
+| 2 | **Full uninstall** | `myleaf-uninstaller-1.5.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
+| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.5.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
 
 ### Paths
 
@@ -142,11 +143,11 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 
 Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
 
-- `dist/myleaf-1.4.pkg` — installer (installs to `/Applications`)
-- `dist/myleaf-uninstaller-1.4.pkg` — full uninstall (app + data)
-- `dist/myleaf-uninstaller-keepdata-1.4.pkg` — uninstall the app, keep user data
-- `dist/myleaf-1.4.dmg` — drag-to-Applications image (includes both uninstallers)
-- `dist/myleaf-1.4.zip`
+- `dist/myleaf-1.5.pkg` — installer (installs to `/Applications`)
+- `dist/myleaf-uninstaller-1.5.pkg` — full uninstall (app + data)
+- `dist/myleaf-uninstaller-keepdata-1.5.pkg` — uninstall the app, keep user data
+- `dist/myleaf-1.5.dmg` — drag-to-Applications image (includes both uninstallers)
+- `dist/myleaf-1.5.zip`
 - `dist/SHA256SUMS.txt`
 
 ---

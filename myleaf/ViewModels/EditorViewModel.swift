@@ -30,6 +30,9 @@ final class EditorViewModel {
     var compilationPhase = ""
     var showBuildLog = false
 
+    /// Recent compile runs for the Performance panel (newest last).
+    private(set) var compilationHistory: [CompilationRecord] = []
+
     let installer = TectonicInstaller()
     let exportService = ExportService()
     let toolManager = ToolManager.shared
@@ -344,14 +347,31 @@ final class EditorViewModel {
             }
             if case .notFound = self.compilerStatus {
                 self.errorMessage = CompilationError.engineNotFound.errorDescription
+                self.recordCompilation(CompilationRecord(
+                    date: Date(),
+                    duration: 0,
+                    preparation: 0,
+                    engine: 0,
+                    pdfCache: 0,
+                    success: false,
+                    engineVersion: "No engine",
+                    pdfBytes: 0
+                ))
                 return
             }
 
+            var engineVersion = "Unknown"
+            if case .ready(let engine) = self.compilerStatus {
+                engineVersion = engine.versionDescription
+            }
+
             self.compilationPhase = "Running LaTeX engine…"
+            let compileStartedAt = Date()
             let result = await self.compiler.compile(
                 source: self.document.sourceText,
                 documentURL: self.document.fileURL
             )
+            let wallDuration = Date().timeIntervalSince(compileStartedAt)
 
             self.compilationPhase = "Loading PDF…"
 
@@ -360,6 +380,16 @@ final class EditorViewModel {
                 self.lastBuildLog = output.log
                 self.lastBuildLogFile = output.logFileURL
                 self.lastCompilationDuration = output.duration
+                self.recordCompilation(CompilationRecord(
+                    date: compileStartedAt,
+                    duration: output.timings.total,
+                    preparation: output.timings.preparation,
+                    engine: output.timings.engine,
+                    pdfCache: output.timings.pdfLoad,
+                    success: true,
+                    engineVersion: engineVersion,
+                    pdfBytes: output.pdfByteCount
+                ))
                 if let pdf = PDFDocument(url: output.pdfFileURL) {
                     self.pdfDocument = pdf
                     self.pdfCacheURL = output.pdfFileURL
@@ -374,6 +404,16 @@ final class EditorViewModel {
                 self.lastBuildLogFile = error.buildLogFile
                 self.lastCompilationDuration = nil
                 self.errorMessage = error.errorDescription
+                self.recordCompilation(CompilationRecord(
+                    date: compileStartedAt,
+                    duration: wallDuration,
+                    preparation: 0,
+                    engine: wallDuration,
+                    pdfCache: 0,
+                    success: false,
+                    engineVersion: engineVersion,
+                    pdfBytes: 0
+                ))
             }
         }
     }
@@ -381,5 +421,16 @@ final class EditorViewModel {
     func showBuildLogPanel() {
         guard lastBuildLog != nil else { return }
         showBuildLog = true
+    }
+
+    func clearCompilationHistory() {
+        compilationHistory.removeAll()
+    }
+
+    private func recordCompilation(_ record: CompilationRecord) {
+        compilationHistory.append(record)
+        if compilationHistory.count > 20 {
+            compilationHistory.removeFirst(compilationHistory.count - 20)
+        }
     }
 }

@@ -34,6 +34,7 @@ struct ContentView: View {
             SettingsView(
                 toolManager: viewModel.toolManager,
                 historyManager: viewModel.historyManager,
+                viewModel: viewModel,
                 onAutoSaveToggled: { viewModel.startAutoSaveIfNeeded() },
                 onTectonicInstall: { viewModel.installTectonic() },
                 onPandocInstall: { viewModel.installPandoc() },

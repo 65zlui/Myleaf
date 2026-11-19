@@ -14,5 +14,6 @@ struct MemoryMonitorTests {
         #expect(monitor.peakFootprint >= monitor.currentFootprint)
         #expect(monitor.lastSampleDate != nil)
         #expect(monitor.sampleCount > 0)
+        #expect(!monitor.history.isEmpty)
     }
 }

@@ -1,4 +1,4 @@
-# myleaf 1.4.0
+# myleaf 1.5.0
 
 A native macOS LaTeX editor for academic writing — now with a hardened,
 project-aware compilation pipeline, build logs with phase timings, automatic
@@ -41,8 +41,13 @@ and a proper app icon.
   engine, loading PDF), and phases are also written to the unified system log.
 
 ### Diagnostics
-- Settings now shows the process's physical memory footprint, peak footprint,
-  resident memory, sample count, and a "Sample Now" action.
+- Settings is now tabbed (General / Tools / Performance).
+- The **Performance** tab shows a live physical-footprint chart with selectable
+  1/5/15/30-minute windows, current/peak/resident counters, and a "Sample Now"
+  action.
+- A per-compile chart breaks each build into preparation / engine / PDF cache
+  time, with a recent-build list (status, engine version, duration, PDF size),
+  average of the last five successful builds, and a Clear action.
 - Footprint is sampled every 2 s with `task_info(TASK_VM_INFO)` (very low
   overhead) and published to SwiftUI.
 - One sample per minute is persisted to
@@ -103,10 +108,10 @@ and a proper app icon.
 
 Choose one:
 
-- **Installer package (recommended):** double-click `myleaf-1.4.pkg` and follow
+- **Installer package (recommended):** double-click `myleaf-1.5.pkg` and follow
   the Installer. myleaf is installed to `/Applications`.
-- **DMG:** open `myleaf-1.4.dmg` and drag **myleaf** into **Applications**.
-- **ZIP:** unzip `myleaf-1.4.zip` and move **myleaf** to **Applications**.
+- **DMG:** open `myleaf-1.5.dmg` and drag **myleaf** into **Applications**.
+- **ZIP:** unzip `myleaf-1.5.zip` and move **myleaf** to **Applications**.
 
 First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
 or run:
@@ -120,7 +125,7 @@ click.
 
 ## Uninstall
 
-**Full uninstall** — double-click `myleaf-uninstaller-1.4.pkg` (DMG:
+**Full uninstall** — double-click `myleaf-uninstaller-1.5.pkg` (DMG:
 `Uninstall myleaf.pkg`). It quits myleaf and removes:
 
 - `/Applications/myleaf.app`
@@ -130,7 +135,7 @@ click.
   container
 
 **Uninstall but keep data** — double-click
-`myleaf-uninstaller-keepdata-1.4.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
+`myleaf-uninstaller-keepdata-1.5.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
 It removes only `/Applications/myleaf.app`; tools, build logs, preferences,
 recent-project history, and caches remain so a later install restores your
 setup.

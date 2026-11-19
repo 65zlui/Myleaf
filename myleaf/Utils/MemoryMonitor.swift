@@ -3,13 +3,15 @@ import Darwin
 import OSLog
 
 /// A single memory reading for the running process.
-struct MemorySample: Codable, Sendable {
+struct MemorySample: Codable, Sendable, Identifiable {
     let timestamp: Date
     /// Physical memory footprint reported by the kernel (includes compressed memory).
     let physicalFootprint: UInt64
     /// Resident set size (pages currently in RAM).
     let residentSize: UInt64
     let virtualSize: UInt64
+
+    var id: Date { timestamp }
 }
 
 /// Lightweight process memory monitor.
@@ -31,10 +33,13 @@ final class MemoryMonitor {
     private(set) var sampleCount = 0
     private(set) var logFileURL: URL?
     private(set) var isRunning = false
+    /// Live samples for the Performance panel (30 minutes at 2 s per sample).
+    private(set) var history: [MemorySample] = []
 
     private let sampleInterval: TimeInterval = 2
     private let logInterval: TimeInterval = 60
     private let maxLogDays = 7
+    private let maxHistoryCount = 900
 
     private var timer: DispatchSourceTimer?
     private var nextLogDate = Date.distantPast
@@ -64,6 +69,7 @@ final class MemoryMonitor {
         isRunning = true
 
         prepareLogDirectory()
+        loadRecentHistory()
 
         // Give AppKit/SwiftUI a few seconds to finish launching before the
         // first persisted sample, otherwise it records a near-empty process.
@@ -103,12 +109,21 @@ final class MemoryMonitor {
     // MARK: - Sampling
 
     private func apply(_ sample: MemorySample) {
+        // task_info can fail transiently and return a zeroed struct; ignoring
+        // those samples keeps the chart from dipping to 0.
+        guard sample.physicalFootprint > 0 else { return }
+
         currentFootprint = sample.physicalFootprint
         peakFootprint = max(peakFootprint, sample.physicalFootprint)
         residentSize = sample.residentSize
         virtualSize = sample.virtualSize
         lastSampleDate = sample.timestamp
         sampleCount += 1
+
+        history.append(sample)
+        if history.count > maxHistoryCount {
+            history.removeFirst(history.count - maxHistoryCount)
+        }
 
         if sample.timestamp >= nextLogDate {
             nextLogDate = sample.timestamp.addingTimeInterval(logInterval)
@@ -152,6 +167,28 @@ final class MemoryMonitor {
         return library
             .appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent("myleaf", isDirectory: true)
+    }
+
+    /// Seeds the chart with today's persisted samples after a relaunch.
+    private func loadRecentHistory(limit: Int = 120) {
+        let url = logDirectory
+            .appendingPathComponent("memory-\(Self.dayFormatter.string(from: Date())).jsonl")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let samples = text
+            .split(separator: "\n")
+            .suffix(limit)
+            .compactMap { line in
+                try? decoder.decode(MemorySample.self, from: Data(line.utf8))
+            }
+            .filter { $0.physicalFootprint > 0 }
+
+        if !samples.isEmpty {
+            history = samples
+        }
     }
 
     private func prepareLogDirectory() {

@@ -183,6 +183,8 @@ struct EditorViewModelCompileTests {
         #expect(viewModel.pdfDocument != nil)
         #expect(viewModel.lastBuildLog?.isEmpty == false)
         #expect(viewModel.lastCompilationDuration != nil)
+        #expect(viewModel.compilationHistory.count == 1)
+        #expect(viewModel.compilationHistory.last?.success == true)
         if let pdfURL = viewModel.pdfCacheURL {
             #expect(FileManager.default.fileExists(atPath: pdfURL.path))
         }

@@ -62,7 +62,8 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 ### 🛡️ 安全与调试
 - **Release 加固**：Hardened Runtime、符号剥离、反调试保护（ptrace）
-- **内存诊断**：设置页实时显示物理内存占用与峰值（每 2 秒通过 `task_info` 采样）；每分钟写入一条到 `~/Library/Logs/myleaf/memory-*.jsonl`，保留最近 7 天
+- **性能面板**：设置 → Performance，包含实时物理内存曲线（1/5/15/30 分钟）、当前/峰值/常驻内存，以及每次编译的阶段耗时（准备 / 引擎 / PDF 缓存）和最近构建列表
+- **内存诊断**：物理内存占用与峰值每 2 秒通过 `task_info` 采样；每分钟写入一条到 `~/Library/Logs/myleaf/memory-*.jsonl`，保留最近 7 天
 - **Debug 日志**：视图 / Coordinator / ViewModel 的 Deinit 追踪
 
 ---
@@ -80,9 +81,9 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 | # | 方式 | 包 | 效果 |
 |---|------|-----|------|
-| 1 | **完整安装** | `myleaf-1.4.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
-| 2 | **完整卸载** | `myleaf-uninstaller-1.4.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
-| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.4.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+| 1 | **完整安装** | `myleaf-1.5.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-1.5.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.5.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
 ### 各路径与处理方式
 
@@ -145,11 +146,11 @@ open myleaf.xcodeproj
 
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
-- `dist/myleaf-1.4.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-1.4.pkg` —— 完整卸载（应用 + 数据）
-- `dist/myleaf-uninstaller-keepdata-1.4.pkg` —— 只卸载应用，保留用户数据
-- `dist/myleaf-1.4.dmg` —— 拖拽安装镜像（内含两个卸载包）
-- `dist/myleaf-1.4.zip`
+- `dist/myleaf-1.5.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-1.5.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-1.5.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-1.5.dmg` —— 拖拽安装镜像（内含两个卸载包）
+- `dist/myleaf-1.5.zip`
 - `dist/SHA256SUMS.txt`
 
 ---

@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     var toolManager: ToolManager
     var historyManager: ProjectHistoryManager
+    var viewModel: EditorViewModel
     var onAutoSaveToggled: () -> Void
     var onTectonicInstall: () -> Void
     var onPandocInstall: () -> Void
@@ -12,6 +13,7 @@ struct SettingsView: View {
 
     @State private var confirmUninstall: ManagedTool?
     @State private var errorMessage: String?
+    @State private var selectedTab = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,17 +29,22 @@ struct SettingsView: View {
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    autoSaveSection
-                    toolManagementSection
-                    diskUsageSection
-                    diagnosticsSection
-                }
-                .padding()
+            TabView(selection: $selectedTab) {
+                generalTab
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                    .tag(0)
+
+                toolsTab
+                    .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                    .tag(1)
+
+                PerformancePanel(viewModel: viewModel)
+                    .tabItem { Label("Performance", systemImage: "chart.xyaxis.line") }
+                    .tag(2)
             }
+            .padding(8)
         }
-        .frame(width: 520, height: 480)
+        .frame(width: 780, height: 700)
         .alert("Confirm Uninstall", isPresented: .init(
             get: { confirmUninstall != nil },
             set: { if !$0 { confirmUninstall = nil } }
@@ -219,71 +226,22 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Diagnostics Section
+    // MARK: - Tabs
 
-    private var memory: MemoryMonitor { .shared }
-
-    private var diagnosticsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Diagnostics", systemImage: "gauge.with.dots.needle.67percent")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 8) {
-                diagnosticRow(
-                    "Current memory",
-                    Int64(memory.currentFootprint).formattedFileSize
-                )
-                diagnosticRow(
-                    "Peak memory",
-                    Int64(memory.peakFootprint).formattedFileSize
-                )
-                diagnosticRow(
-                    "Resident memory",
-                    Int64(memory.residentSize).formattedFileSize
-                )
-
-                HStack(spacing: 8) {
-                    Text("Samples")
-                        .font(.callout)
-                    Text("\(memory.sampleCount)")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Sample Now") {
-                        memory.sampleNow()
-                    }
-                    .controlSize(.small)
-                }
-
-                if let logURL = memory.logFileURL {
-                    HStack(spacing: 8) {
-                        Text("Memory log")
-                            .font(.callout)
-                        Spacer()
-                        Button("Show") {
-                            NSWorkspace.shared.activateFileViewerSelecting([logURL])
-                        }
-                        .controlSize(.small)
-                    }
-                }
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-
-            Text("Physical footprint sampled every 2 s. One sample per minute is written to ~/Library/Logs/myleaf/memory-*.jsonl; the last 7 days are kept.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+    private var generalTab: some View {
+        ScrollView {
+            autoSaveSection
+                .padding(16)
         }
     }
 
-    private func diagnosticRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.callout)
-            Spacer()
-            Text(value)
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
+    private var toolsTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                toolManagementSection
+                diskUsageSection
+            }
+            .padding(16)
         }
     }
 
