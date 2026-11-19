@@ -2,7 +2,7 @@
 
 > 时间：2026-11-18 ~ 2026-11-19
 > 仓库：`git@github.com:65zlui/Myleaf.git`（`main`）
-> 对应版本：v1.5.0
+> 对应版本：v1.5.1
 >
 > 本文记录的是**定位问题、修改代码、验证修复**的过程，而不是应用运行时的操作日志。
 > 应用运行时的编译日志见下文第 5 节（功能实现）以及 `~/Library/Logs/myleaf/`。
@@ -313,7 +313,7 @@ xattr -lr build/Build/Products/Release/myleaf.app
 **验证**
 
 ```text
-myleaf-1.5.dmg: valid on disk / satisfies its Designated Requirement
+myleaf-1.5.1.dmg: valid on disk / satisfies its Designated Requirement
 Signature=adhoc, Format=universal (x86_64 arm64), Runtime Version=15.5.0
 ```
 
@@ -466,17 +466,17 @@ prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
 
 `pkgbuild` 生成三个本地包，对应三种路径：
 
-1. **`myleaf-1.5.pkg`**（完整安装）
+1. **`myleaf-1.5.1.pkg`**（完整安装）
    - 用 `--root` 构造 payload：`Applications/myleaf.app`，安装位置 `/`。
    - `preinstall` 先 `pkill -x myleaf`，避免覆盖正在运行的应用。
    - 验证方式：`pkgutil --expand-full` 解开 payload，确认 `codesign --verify`
      仍通过（payload 里的 app 签名有效）。
-2. **`myleaf-uninstaller-1.5.pkg`**（完整卸载）
+2. **`myleaf-uninstaller-1.5.1.pkg`**（完整卸载）
    - `pkgbuild --nopayload`，只用 `preinstall` 执行清理。
    - 删除 `/Applications/myleaf.app`、应用管理的 Tectonic/Pandoc、编译日志、
      Tectonic 缓存、应用缓存、偏好设置、窗口状态、旧沙盒容器。
    - 保留用户 `.tex` 项目和系统安装的 TeX/Pandoc。
-3. **`myleaf-uninstaller-keepdata-1.5.pkg`**（卸载但保留数据）
+3. **`myleaf-uninstaller-keepdata-1.5.1.pkg`**（卸载但保留数据）
    - 只删除 `/Applications/myleaf.app`。
    - 保留 `Application Support/myleaf`（工具）、`Logs/myleaf`（编译日志）、
      偏好设置/最近项目、Tectonic 缓存等，重新安装后可恢复原状态。
@@ -633,6 +633,33 @@ CoreUI image data   2.3 MB
 - 51 个测试通过；ViewModel 测试断言 `compilationHistory` 有成功记录
 - Debug 构建可启动；Performance 选项卡由同一 SwiftUI 视图渲染
 
+### 5.5 修复 Settings 打不开 / 窗口跑出屏幕（v1.5.1）
+
+**现象**
+
+- 欢迎页状态下点击 myleaf → Settings（⌘,）没有任何反应
+- 窗口记录的位置为 `(369, 417)`、尺寸 `1470×878`，底部超出屏幕
+
+**定位**
+
+- `Settings` 菜单动作依赖 `@FocusedValue(\.editorViewModel)`；
+  欢迎页没有获得焦点的子视图，focused value 为 nil，动作直接空转
+- 点击编辑器后再打开就正常，验证了焦点依赖
+- 窗口 frame 来自持久化状态，换分辨率/布局后可能完全或大部分在屏幕外
+
+**修复**
+
+1. `ContentView` 改用 `.focusedSceneValue(\.editorViewModel, viewModel)`，
+   让命令在场景级别拿到 view model，不依赖具体视图焦点
+2. `AppDelegate` 在启动和窗口成为 key window 时检查 frame：
+   - 与可见区域交集小于 80×80 → 居中并缩小到屏幕内
+   - 部分越界 → 将尺寸/原点夹紧到 `visibleFrame`
+
+**验证**
+
+- 欢迎页直接点击 Settings 成功打开（General / Tools / Performance 三个选项卡）
+- 窗口从 `(369,417)` 恢复到 `(0,37)`、`1470×878`，完整可见
+
 ---
 
 ## 6. 验证矩阵
@@ -684,8 +711,9 @@ CoreUI image data   2.3 MB
 | v1.3 提交 | 内存占用监控（task_info 采样 + JSONL 日志 + 设置页 Diagnostics） |
 | v1.4 提交 | PDF 文件缓存 + 撤销栈上限（降低大文档/大 PDF 峰值） |
 | v1.5 提交 | 设置页选项卡 + Performance 可视化面板（内存曲线 / 编译阶段耗时） |
+| v1.5.1 提交 | 修复欢迎页无法打开 Settings；恢复屏幕外窗口 |
 
-标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）→ `v1.4.0`（内存优化）→ `v1.5.0`（性能面板）。
+标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）→ `v1.4.0`（内存优化）→ `v1.5.0`（性能面板）→ `v1.5.1`（Settings/窗口修复）。
 
 ---
 

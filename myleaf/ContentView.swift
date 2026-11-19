@@ -23,7 +23,9 @@ struct ContentView: View {
                 editorContent
             }
         }
-        .focusedValue(\.editorViewModel, viewModel)
+        // Scene-level value so File > Settings (⌘,) works even when the
+        // welcome screen has no focused view and @FocusedValue would be nil.
+        .focusedSceneValue(\.editorViewModel, viewModel)
         .sheet(isPresented: $viewModel.showTemplatePicker) {
             TemplatePicker { template in
                 viewModel.applyTemplate(template)

@@ -1,4 +1,4 @@
-# myleaf 1.5.0
+# myleaf 1.5.1
 
 A native macOS LaTeX editor for academic writing — now with a hardened,
 project-aware compilation pipeline, build logs with phase timings, automatic
@@ -6,6 +6,14 @@ selection of the newest installed Tectonic engine, process memory diagnostics,
 and a proper app icon.
 
 ## Highlights
+
+### Fixes
+- **Settings now opens from the welcome screen.** The menu command used a
+  view-focused value, which is nil when no editor has focus; it now uses a
+  scene-level focused value, so ⌘, and myleaf → Settings always work.
+- **Off-screen windows are recovered.** A saved window frame outside the
+  visible screen area is recentered (or clamped) at launch and whenever the
+  window becomes key.
 
 ### Compilation
 - Compiles inside the document's own folder, so `\input{}`, images, and
@@ -108,10 +116,10 @@ and a proper app icon.
 
 Choose one:
 
-- **Installer package (recommended):** double-click `myleaf-1.5.pkg` and follow
+- **Installer package (recommended):** double-click `myleaf-1.5.1.pkg` and follow
   the Installer. myleaf is installed to `/Applications`.
-- **DMG:** open `myleaf-1.5.dmg` and drag **myleaf** into **Applications**.
-- **ZIP:** unzip `myleaf-1.5.zip` and move **myleaf** to **Applications**.
+- **DMG:** open `myleaf-1.5.1.dmg` and drag **myleaf** into **Applications**.
+- **ZIP:** unzip `myleaf-1.5.1.zip` and move **myleaf** to **Applications**.
 
 First launch only: right-click **myleaf** → **Open** if Gatekeeper blocks it,
 or run:
@@ -125,7 +133,7 @@ click.
 
 ## Uninstall
 
-**Full uninstall** — double-click `myleaf-uninstaller-1.5.pkg` (DMG:
+**Full uninstall** — double-click `myleaf-uninstaller-1.5.1.pkg` (DMG:
 `Uninstall myleaf.pkg`). It quits myleaf and removes:
 
 - `/Applications/myleaf.app`
@@ -135,7 +143,7 @@ click.
   container
 
 **Uninstall but keep data** — double-click
-`myleaf-uninstaller-keepdata-1.5.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
+`myleaf-uninstaller-keepdata-1.5.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
 It removes only `/Applications/myleaf.app`; tools, build logs, preferences,
 recent-project history, and caches remain so a later install restores your
 setup.
