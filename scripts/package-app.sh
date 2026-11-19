@@ -57,17 +57,22 @@ DMG="$DIST_DIR/myleaf-$VERSION.dmg"
 ZIP="$DIST_DIR/myleaf-$VERSION.zip"
 PKG="$DIST_DIR/myleaf-$VERSION.pkg"
 UNINSTALLER_PKG="$DIST_DIR/myleaf-uninstaller-$VERSION.pkg"
+KEEP_UNINSTALLER_PKG="$DIST_DIR/myleaf-uninstaller-keepdata-$VERSION.pkg"
 
-rm -rf "$DMG" "$ZIP" "$PKG" "$UNINSTALLER_PKG" "$DIST_DIR/myleaf.app"
+rm -rf "$DMG" "$ZIP" "$PKG" "$UNINSTALLER_PKG" "$KEEP_UNINSTALLER_PKG" "$DIST_DIR/myleaf.app"
 # Drop artifacts from older versions so dist/ only contains the current build.
 find "$DIST_DIR" -maxdepth 1 -type f \
     \( -name 'myleaf-*.dmg' -o -name 'myleaf-*.zip' -o -name 'myleaf-*.pkg' \) \
     ! -name "myleaf-$VERSION.dmg" \
     ! -name "myleaf-$VERSION.zip" \
     ! -name "myleaf-$VERSION.pkg" \
-    ! -name "myleaf-uninstaller-$VERSION.pkg" -delete
+    ! -name "myleaf-uninstaller-$VERSION.pkg" \
+    ! -name "myleaf-uninstaller-keepdata-$VERSION.pkg" -delete
 
-chmod +x "$ROOT/scripts/pkg/install/preinstall" "$ROOT/scripts/pkg/uninstall/preinstall"
+chmod +x \
+    "$ROOT/scripts/pkg/install/preinstall" \
+    "$ROOT/scripts/pkg/uninstall/preinstall" \
+    "$ROOT/scripts/pkg/uninstall-keepdata/preinstall"
 
 # Installer: payload root /Applications/myleaf.app, with a preinstall script
 # that quits a running copy.
@@ -94,10 +99,19 @@ pkgbuild \
     --scripts "$ROOT/scripts/pkg/uninstall" \
     "$UNINSTALLER_PKG"
 
+# Keep-data uninstaller: removes only /Applications/myleaf.app.
+pkgbuild \
+    --nopayload \
+    --identifier com.65zlui.myleaf.uninstaller.keepdata \
+    --version "$VERSION" \
+    --scripts "$ROOT/scripts/pkg/uninstall-keepdata" \
+    "$KEEP_UNINSTALLER_PKG"
+
 echo "==> Packaging DMG and ZIP"
 cp -R "$APP" "$STAGE/myleaf.app"
 ln -s /Applications "$STAGE/Applications"
 cp "$UNINSTALLER_PKG" "$STAGE/Uninstall myleaf.pkg"
+cp "$KEEP_UNINSTALLER_PKG" "$STAGE/Uninstall myleaf (keep data).pkg"
 
 hdiutil create -volname "myleaf $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 ditto -c -k --keepParent "$APP" "$ZIP"
@@ -108,7 +122,8 @@ ditto -c -k --keepParent "$APP" "$ZIP"
         "$(basename "$DMG")" \
         "$(basename "$ZIP")" \
         "$(basename "$PKG")" \
-        "$(basename "$UNINSTALLER_PKG")" > SHA256SUMS.txt
+        "$(basename "$UNINSTALLER_PKG")" \
+        "$(basename "$KEEP_UNINSTALLER_PKG")" > SHA256SUMS.txt
 )
 
 echo "==> Done"

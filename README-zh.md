@@ -72,39 +72,55 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 - macOS 14.0 (Sonoma) 或更高版本
 - Apple Silicon (ARM64) 或 Intel (x86_64)
 
-### 安装
+### 安装 / 卸载方式
 
-从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版本：
+从 [Releases](https://github.com/65zlui/myleaf/releases) 页面下载最新版本。三种方式均可在 Finder 中双击，macOS 会要求输入管理员密码。
 
-- **安装包（推荐）**：`myleaf-1.1.pkg` —— 双击并按提示安装，应用会安装到 `/Applications`。
-- **DMG / ZIP**：打开 DMG（或解压 ZIP），将 **myleaf** 拖入 Applications 文件夹。
+| # | 方式 | 包 | 效果 |
+|---|------|-----|------|
+| 1 | **完整安装** | `myleaf-1.1.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-1.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+
+### 各路径与处理方式
+
+| 内容 | 路径 | 方式 2（完整卸载） | 方式 3（保留数据） |
+|------|------|-------------------|--------------------|
+| 应用程序 | `/Applications/myleaf.app` | 删除 | 删除 |
+| 应用管理的工具（Tectonic/Pandoc） | `~/Library/Application Support/myleaf` | 删除 | 保留 |
+| 编译日志 | `~/Library/Logs/myleaf` | 删除 | 保留 |
+| 偏好设置、最近项目、自动保存 | `~/Library/Preferences/com.65zlui.myleaf.plist` | 删除 | 保留 |
+| Tectonic 包缓存 | `~/Library/Caches/Tectonic` | 删除 | 保留 |
+| 应用缓存 / HTTP 存储 | `~/Library/Caches/com.65zlui.myleaf`、`~/Library/HTTPStorages/com.65zlui.myleaf` | 删除 | 保留 |
+| 窗口状态 | `~/Library/Saved Application State/com.65zlui.myleaf.savedState` | 删除 | 保留 |
+| 旧版沙盒容器 | `~/Library/Containers/com.65zlui.myleaf` | 删除 | 保留 |
+
+无论哪种方式，你的 `.tex` 项目文件以及系统安装的 TeX / Pandoc **都不会**被删除。
 
 > **首次启动**：应用会自动检测 LaTeX 引擎。如未安装，可在设置中一键安装 Tectonic（约 25MB）。
 
-> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止安装包或应用，请右键选择「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/myleaf.app`。
+> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止安装包或应用，请右键选择「打开」。
 
-### 卸载
+> **方式 3 的作用**：保留最近项目历史、自动保存开关、已下载的工具和编译日志，重新安装后即可恢复原有使用状态。
 
-双击 `myleaf-uninstaller-1.1.pkg`（DMG 中同样附带）。它会退出应用并删除：
-
-- `/Applications/myleaf.app`
-- 应用管理的工具：`~/Library/Application Support/myleaf`（Tectonic / Pandoc）
-- 编译日志：`~/Library/Logs/myleaf`
-- Tectonic 缓存、偏好设置、窗口状态、旧版沙盒容器
-
-你的 `.tex` 项目文件，以及系统安装的 TeX / Pandoc **不会**被删除。
-
-如需手动卸载：
+### 手动命令
 
 ```bash
+# 方式 2 —— 完整卸载
 sudo rm -rf /Applications/myleaf.app
 rm -rf ~/Library/Application\ Support/myleaf \
        ~/Library/Logs/myleaf \
        ~/Library/Caches/Tectonic \
        ~/Library/Caches/com.65zlui.myleaf \
+       ~/Library/HTTPStorages/com.65zlui.myleaf \
        ~/Library/Preferences/com.65zlui.myleaf.plist \
        ~/Library/Saved\ Application\ State/com.65zlui.myleaf.savedState \
        ~/Library/Containers/com.65zlui.myleaf
+sudo pkgutil --forget com.65zlui.myleaf
+
+# 方式 3 —— 卸载但保留数据（只删除应用）
+sudo rm -rf /Applications/myleaf.app
+sudo pkgutil --forget com.65zlui.myleaf
 ```
 
 ### 从源码构建
@@ -126,8 +142,9 @@ open myleaf.xcodeproj
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
 - `dist/myleaf-1.1.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-1.1.pkg` —— 卸载包
-- `dist/myleaf-1.1.dmg` —— 拖拽安装镜像（内含卸载包）
+- `dist/myleaf-uninstaller-1.1.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-1.1.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-1.1.dmg` —— 拖拽安装镜像（内含两个卸载包）
 - `dist/myleaf-1.1.zip`
 - `dist/SHA256SUMS.txt`
 

@@ -37,13 +37,16 @@ project-aware compilation pipeline, full build logs, and a proper app icon.
 - Universal binary: Apple Silicon + Intel.
 - Minimum supported macOS is now 14.0 (Sonoma), matching the README.
 - Reproducible release packaging: `scripts/package-app.sh` produces an
-  installer `.pkg`, a matching uninstaller `.pkg`, a DMG, a ZIP, and
-  `SHA256SUMS.txt`.
-- The installer package puts myleaf in `/Applications`; the uninstaller quits
-  the app and removes the bundle, app-managed tools, build logs, caches,
-  preferences, saved state, and the legacy sandbox container. Projects and
-  system TeX/Pandoc installs are left untouched.
-- The DMG also includes the uninstaller package.
+  installer `.pkg`, a full uninstaller `.pkg`, a keep-data uninstaller `.pkg`,
+  a DMG, a ZIP, and `SHA256SUMS.txt`.
+- Three supported macOS modes: full install, full uninstall (app + data), and
+  uninstall-while-keeping-data (app only; settings, history, tools, and logs
+  are preserved for the next install).
+- The installer package puts myleaf in `/Applications`; the full uninstaller
+  removes the bundle, app-managed tools, build logs, caches, preferences,
+  saved state, and the legacy sandbox container. Projects and system
+  TeX/Pandoc installs are left untouched.
+- The DMG includes both uninstaller packages.
 - Hardened Runtime; ad-hoc signed (no paid Developer ID).
 - Fixed the anti-debug `PT_DENY_ATTACH` constant.
 
@@ -78,16 +81,23 @@ click.
 
 ## Uninstall
 
-Double-click `myleaf-uninstaller-1.1.pkg` (also included in the DMG). It quits
-myleaf and removes the application plus its per-user data:
+**Full uninstall** — double-click `myleaf-uninstaller-1.1.pkg` (DMG:
+`Uninstall myleaf.pkg`). It quits myleaf and removes:
 
 - `/Applications/myleaf.app`
 - `~/Library/Application Support/myleaf` (Tectonic/Pandoc installed by the app)
-- `~/Library/Logs/myleaf`, Tectonic caches, preferences, saved state, and the
-  legacy sandbox container
+- `~/Library/Logs/myleaf`
+- Tectonic cache, app cache, preferences, saved state, and the legacy sandbox
+  container
 
-`.tex` projects and system TeX/Pandoc installations are never removed. A manual
-removal command is listed in the README.
+**Uninstall but keep data** — double-click
+`myleaf-uninstaller-keepdata-1.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`).
+It removes only `/Applications/myleaf.app`; tools, build logs, preferences,
+recent-project history, and caches remain so a later install restores your
+setup.
+
+`.tex` projects and system TeX/Pandoc installations are never removed. Manual
+commands for both modes are listed in the README.
 
 **Requirements:** macOS 14.0 or later, Apple Silicon or Intel.
 

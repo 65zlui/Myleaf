@@ -69,39 +69,55 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 - macOS 14.0 (Sonoma) or later
 - Apple Silicon (ARM64) or Intel (x86_64)
 
-### Install
+### Install / uninstall modes
 
-Download the latest release from the [Releases](https://github.com/65zlui/myleaf/releases) page:
+Download the latest release from the [Releases](https://github.com/65zlui/myleaf/releases) page. There are three supported modes; all packages can be double-clicked in Finder and macOS will ask for an administrator password.
 
-- **Installer package (recommended)**: `myleaf-1.1.pkg` — double-click, follow the Installer, and myleaf is installed to `/Applications`.
-- **DMG / ZIP**: open the DMG (or unzip) and drag **myleaf** into your Applications folder.
+| # | Mode | Package | Effect |
+|---|------|---------|--------|
+| 1 | **Full install** | `myleaf-1.1.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
+| 2 | **Full uninstall** | `myleaf-uninstaller-1.1.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
+| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-1.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
+
+### Paths
+
+| What | Path | Mode 2 (full) | Mode 3 (keep data) |
+|------|------|---------------|--------------------|
+| Application | `/Applications/myleaf.app` | removed | removed |
+| Managed tools (Tectonic/Pandoc) | `~/Library/Application Support/myleaf` | removed | kept |
+| Build logs | `~/Library/Logs/myleaf` | removed | kept |
+| Preferences, recent projects, auto-save | `~/Library/Preferences/com.65zlui.myleaf.plist` | removed | kept |
+| Tectonic package cache | `~/Library/Caches/Tectonic` | removed | kept |
+| App cache / HTTP storage | `~/Library/Caches/com.65zlui.myleaf`, `~/Library/HTTPStorages/com.65zlui.myleaf` | removed | kept |
+| Saved window state | `~/Library/Saved Application State/com.65zlui.myleaf.savedState` | removed | kept |
+| Legacy sandbox container | `~/Library/Containers/com.65zlui.myleaf` | removed | kept |
+
+Your `.tex` projects and system TeX/Pandoc installations are **never** touched in any mode.
 
 > **First launch**: The app will automatically detect available LaTeX engines. If none are found, you can install Tectonic with one click in Settings (~25MB download).
 
-> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the installer or app, right-click it and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/myleaf.app`.
+> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the installer or app, right-click it and choose **Open**.
 
-### Uninstall
+> **Mode 3** keeps recent-project history, the auto-save setting, downloaded tools, and build logs, so reinstalling restores your setup.
 
-Run `myleaf-uninstaller-1.1.pkg` (also included in the DMG). It quits the app and removes:
-
-- `/Applications/myleaf.app`
-- App-managed tools in `~/Library/Application Support/myleaf` (Tectonic/Pandoc)
-- Build logs in `~/Library/Logs/myleaf`
-- Tectonic cache, preferences, saved state, and the legacy sandbox container
-
-Your `.tex` projects and any system TeX/Pandoc installations are **never** touched.
-
-Manual removal, if you prefer:
+### Manual commands
 
 ```bash
+# Mode 2 — full uninstall
 sudo rm -rf /Applications/myleaf.app
 rm -rf ~/Library/Application\ Support/myleaf \
        ~/Library/Logs/myleaf \
        ~/Library/Caches/Tectonic \
        ~/Library/Caches/com.65zlui.myleaf \
+       ~/Library/HTTPStorages/com.65zlui.myleaf \
        ~/Library/Preferences/com.65zlui.myleaf.plist \
        ~/Library/Saved\ Application\ State/com.65zlui.myleaf.savedState \
        ~/Library/Containers/com.65zlui.myleaf
+sudo pkgutil --forget com.65zlui.myleaf
+
+# Mode 3 — keep data (only the app is removed)
+sudo rm -rf /Applications/myleaf.app
+sudo pkgutil --forget com.65zlui.myleaf
 ```
 
 ### Build from Source
@@ -123,8 +139,9 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
 
 - `dist/myleaf-1.1.pkg` — installer (installs to `/Applications`)
-- `dist/myleaf-uninstaller-1.1.pkg` — uninstaller
-- `dist/myleaf-1.1.dmg` — drag-to-Applications image (includes the uninstaller)
+- `dist/myleaf-uninstaller-1.1.pkg` — full uninstall (app + data)
+- `dist/myleaf-uninstaller-keepdata-1.1.pkg` — uninstall the app, keep user data
+- `dist/myleaf-1.1.dmg` — drag-to-Applications image (includes both uninstallers)
 - `dist/myleaf-1.1.zip`
 - `dist/SHA256SUMS.txt`
 

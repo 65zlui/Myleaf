@@ -1,0 +1,54 @@
+#!/bin/bash
+# myleaf uninstaller — keep user data.
+#
+# Removes only the application bundle. Everything myleaf created for the user
+# is preserved so a later reinstall restores preferences, recent projects,
+# build logs, and the downloaded Tectonic/Pandoc tools.
+#
+# MYLEAF_UNINSTALL_APP_PATH / MYLEAF_UNINSTALL_HOME exist for local testing.
+
+set -u
+
+LOG="/tmp/myleaf-uninstall.log"
+exec >>"$LOG" 2>&1
+echo "=== myleaf uninstall (keep data) $(/bin/date) ==="
+
+/usr/bin/pkill -x myleaf >/dev/null 2>&1 || true
+
+APP_PATH="${MYLEAF_UNINSTALL_APP_PATH:-/Applications/myleaf.app}"
+if [ -d "$APP_PATH" ]; then
+    /bin/rm -rf "$APP_PATH" && echo "Removed $APP_PATH"
+fi
+
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+USER_HOME=""
+if [ -n "${CONSOLE_USER:-}" ] && [ "$CONSOLE_USER" != "root" ]; then
+    USER_HOME="$(/usr/bin/dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null \
+        | /usr/bin/awk '{print $2}')"
+fi
+if [ -n "${MYLEAF_UNINSTALL_HOME:-}" ]; then
+    USER_HOME="$MYLEAF_UNINSTALL_HOME"
+fi
+
+if [ -n "${USER_HOME:-}" ] && [ -d "$USER_HOME" ]; then
+    echo "Preserved user data under $USER_HOME:"
+    for path in \
+        "$USER_HOME/Library/Application Support/myleaf" \
+        "$USER_HOME/Library/Logs/myleaf" \
+        "$USER_HOME/Library/Preferences/com.65zlui.myleaf.plist" \
+        "$USER_HOME/Library/Caches/Tectonic" \
+        "$USER_HOME/Library/Caches/com.65zlui.myleaf" \
+        "$USER_HOME/Library/Saved Application State/com.65zlui.myleaf.savedState" \
+        "$USER_HOME/Library/Containers/com.65zlui.myleaf"; do
+        if [ -e "$path" ]; then
+            echo "  $path"
+        fi
+    done
+fi
+
+# Forget the application receipt so a reinstall behaves like a fresh install.
+# User data is intentionally left in place.
+/usr/sbin/pkgutil --forget com.65zlui.myleaf >/dev/null 2>&1 || true
+
+echo "=== myleaf uninstall (keep data) finished ==="
+exit 0

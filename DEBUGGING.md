@@ -404,21 +404,32 @@ func applicationShouldRestoreSecureApplicationState(_ app: NSApplication) -> Boo
 
 ### 安装包与卸载包
 
-`pkgbuild` 生成两个本地包：
+`pkgbuild` 生成三个本地包，对应三种路径：
 
-1. **`myleaf-1.1.pkg`**（安装）
+1. **`myleaf-1.1.pkg`**（完整安装）
    - 用 `--root` 构造 payload：`Applications/myleaf.app`，安装位置 `/`。
    - `preinstall` 先 `pkill -x myleaf`，避免覆盖正在运行的应用。
    - 验证方式：`pkgutil --expand-full` 解开 payload，确认 `codesign --verify`
      仍通过（payload 里的 app 签名有效）。
-2. **`myleaf-uninstaller-1.1.pkg`**（卸载）
+2. **`myleaf-uninstaller-1.1.pkg`**（完整卸载）
    - `pkgbuild --nopayload`，只用 `preinstall` 执行清理。
    - 删除 `/Applications/myleaf.app`、应用管理的 Tectonic/Pandoc、编译日志、
-     Tectonic 缓存、偏好设置、窗口状态、旧沙盒容器。
+     Tectonic 缓存、应用缓存、偏好设置、窗口状态、旧沙盒容器。
    - 保留用户 `.tex` 项目和系统安装的 TeX/Pandoc。
-   - 为便于验证，脚本支持 `MYLEAF_UNINSTALL_APP_PATH` / `MYLEAF_UNINSTALL_HOME`
-     环境变量覆盖；在 `/tmp` 下用假目录实测：应用与数据被删除，退出码 0。
-   - 卸载包同时被复制进 DMG，命名为 `Uninstall myleaf.pkg`。
+3. **`myleaf-uninstaller-keepdata-1.1.pkg`**（卸载但保留数据）
+   - 只删除 `/Applications/myleaf.app`。
+   - 保留 `Application Support/myleaf`（工具）、`Logs/myleaf`（编译日志）、
+     偏好设置/最近项目、Tectonic 缓存等，重新安装后可恢复原状态。
+   - 与完整卸载共用 `/tmp/myleaf-uninstall.log`，并记录保留的路径列表。
+
+两个卸载脚本都支持 `MYLEAF_UNINSTALL_APP_PATH` / `MYLEAF_UNINSTALL_HOME`
+环境变量覆盖；在 `/tmp` 下用假目录分别实测：
+
+- 完整卸载：应用与数据目录被删除，退出码 0。
+- 保留数据：应用被删除，`Application Support`、`Logs`、偏好设置等仍在。
+
+两个卸载包同时被复制进 DMG，分别命名为
+`Uninstall myleaf.pkg` 与 `Uninstall myleaf (keep data).pkg`。
 
 ---
 
@@ -482,9 +493,10 @@ Finished: 2026-11-19 00:12:33.041
 | DMG 启动 | 挂载后运行 | 正常 |
 | 安装包 payload | `pkgutil --expand-full` + `codesign --verify` | 通过，payload 内 app 签名有效 |
 | 安装包元数据 | 查看 `PackageInfo` | `com.65zlui.myleaf`，1.1，min OS 14.0，含 preinstall |
-| 卸载包结构 | `pkgutil --expand-full` | 无 payload，preinstall 可执行 |
-| 卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用与数据目录被删除，退出码 0 |
-| DMG 内容 | `hdiutil attach` | app + Applications 链接 + 卸载包 |
+| 卸载包结构 | `pkgutil --expand-full` | 两个包均无 payload，preinstall 可执行 |
+| 完整卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用与数据目录被删除，退出码 0 |
+| 保留数据卸载逻辑 | 临时目录 + 环境变量覆盖 | 应用被删除，工具/日志/偏好保留 |
+| DMG 内容 | `hdiutil attach` | app + Applications 链接 + 两个卸载包 |
 | 应用图标 | 构建产物 `AppIcon.icns` + 截图 | 已生效 |
 
 测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）。
