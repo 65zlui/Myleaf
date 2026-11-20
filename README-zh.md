@@ -81,9 +81,9 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 | # | 方式 | 包 | 效果 |
 |---|------|-----|------|
-| 1 | **完整安装** | `myleaf-1.5.1.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
-| 2 | **完整卸载** | `myleaf-uninstaller-1.5.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
-| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-1.5.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+| 1 | **完整安装** | `myleaf-0.1.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-0.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
 ### 各路径与处理方式
 
@@ -146,11 +146,11 @@ open myleaf.xcodeproj
 
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
-- `dist/myleaf-1.5.1.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-1.5.1.pkg` —— 完整卸载（应用 + 数据）
-- `dist/myleaf-uninstaller-keepdata-1.5.1.pkg` —— 只卸载应用，保留用户数据
-- `dist/myleaf-1.5.1.dmg` —— 拖拽安装镜像（内含两个卸载包）
-- `dist/myleaf-1.5.1.zip`
+- `dist/myleaf-0.1.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-0.1.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-0.1.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-0.1.dmg` —— 拖拽安装镜像（内含两个卸载包）
+- `dist/myleaf-0.1.zip`
 - `dist/SHA256SUMS.txt`
 
 ---
