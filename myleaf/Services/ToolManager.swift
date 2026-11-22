@@ -43,6 +43,7 @@ final class ToolManager {
     var statusMessage = ""
 
     private let fm = FileManager.default
+    private var refreshGeneration = 0
 
     private let appSupportDir: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -57,9 +58,30 @@ final class ToolManager {
 
     // MARK: - Status
 
+    /// Marks tools as "checking" immediately, then probes versions off the main
+    /// thread. Probing used to run synchronously in `init` and delayed the first
+    /// window by a process launch per installed tool.
     func refreshAll() {
+        refreshGeneration += 1
+        let generation = refreshGeneration
+
         for tool in ManagedTool.allCases {
-            toolStates[tool] = checkState(tool)
+            toolStates[tool] = .checking
+        }
+
+        let binDir = self.binDir
+        Task.detached(priority: .utility) {
+            var collected: [ManagedTool: ToolState] = [:]
+            for tool in ManagedTool.allCases {
+                collected[tool] = Self.checkState(tool, in: binDir)
+            }
+            let states = collected
+
+            await MainActor.run {
+                guard self.refreshGeneration == generation else { return }
+                self.toolStates = states
+                LaunchMetrics.mark("tools.ready")
+            }
         }
     }
 
@@ -72,25 +94,19 @@ final class ToolManager {
         binDir.appendingPathComponent(tool.binaryName)
     }
 
-    private func checkState(_ tool: ManagedTool) -> ToolState {
-        let path = binaryPath(tool)
+    nonisolated private static func checkState(_ tool: ManagedTool, in binDir: URL) -> ToolState {
+        let fm = FileManager.default
+        let path = binDir.appendingPathComponent(tool.binaryName)
         guard fm.isExecutableFile(atPath: path.path) else {
             return .notInstalled
         }
 
-        // Get file size
         let size = (try? fm.attributesOfItem(atPath: path.path)[.size] as? Int64) ?? 0
-
-        // Try to get version
-        let version = queryVersion(tool)
-
+        let version = queryVersion(at: path)
         return .installed(version: version, size: size, path: path.path)
     }
 
-    private func queryVersion(_ tool: ManagedTool) -> String? {
-        let path = binaryPath(tool)
-        guard fm.isExecutableFile(atPath: path.path) else { return nil }
-
+    nonisolated private static func queryVersion(at path: URL) -> String? {
         let process = Process()
         process.executableURL = path
         process.arguments = ["--version"]
@@ -104,7 +120,6 @@ final class ToolManager {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) {
-                // Take first line only
                 return output.components(separatedBy: .newlines).first
             }
         } catch {}
@@ -191,11 +206,13 @@ final class ToolManager {
 // MARK: - ToolState
 
 enum ToolState: Equatable {
+    case checking
     case notInstalled
     case installed(version: String?, size: Int64, path: String)
 
     static func == (lhs: ToolState, rhs: ToolState) -> Bool {
         switch (lhs, rhs) {
+        case (.checking, .checking): return true
         case (.notInstalled, .notInstalled): return true
         case (.installed(let v1, let s1, let p1), .installed(let v2, let s2, let p2)):
             return v1 == v2 && s1 == s2 && p1 == p2

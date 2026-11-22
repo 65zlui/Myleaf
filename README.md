@@ -61,6 +61,7 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 - **Release hardening**: Hardened Runtime, symbol stripping, anti-debug protection (ptrace)
 - **Performance panel**: Settings → Performance shows a live physical-footprint chart (1/5/15/30 min), current/peak/resident counters, and per-compile phase timings (preparation / engine / PDF cache) with the recent build list
 - **Memory diagnostics**: Live physical footprint and peak (sampled every 2 s via `task_info`); one sample per minute is written to `~/Library/Logs/myleaf/memory-*.jsonl` (last 7 days kept)
+- **Launch timing**: phase marks (`app.init`, `viewModel.start`, `firstWindow`, `engine.ready`, …) are written to `~/Library/Logs/myleaf/launch-*.log`
 - **Debug logging**: deinit tracing for views, coordinators, and the view model
 
 ---

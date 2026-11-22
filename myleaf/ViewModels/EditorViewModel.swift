@@ -35,7 +35,9 @@ final class EditorViewModel {
 
     let installer = TectonicInstaller()
     let exportService = ExportService()
-    let toolManager = ToolManager.shared
+    /// Lazy: ToolManager probes installed tool versions. Do not initialize it
+    /// during app launch; Settings or an install action will access it later.
+    var toolManager: ToolManager { ToolManager.shared }
     let historyManager = ProjectHistoryManager.shared
     private let compiler = LaTeXCompiler()
     private var savedText: String = ""
@@ -51,19 +53,38 @@ final class EditorViewModel {
         document.fileURL?.lastPathComponent ?? "document.tex"
     }
 
+    private var hasStarted = false
+
     init() {
+        LaunchMetrics.mark("viewModel.init.begin")
         savedText = document.sourceText
-        PDFCache.prune()
+        // Side effects (engine detection, history restore, cache pruning) are
+        // deferred to start(), called from ContentView.task. SwiftUI can evaluate
+        // the @State initializer more than once; running side effects here would
+        // launch duplicate engine probes and auto-save tasks.
+        showWelcome = true
+        LaunchMetrics.mark("viewModel.init.end")
+    }
+
+    /// Called once from the live ContentView. Discarded initializer instances
+    /// never reach this method.
+    func start() {
+        guard !hasStarted else { return }
+        hasStarted = true
+        LaunchMetrics.mark("viewModel.start")
+
+        Task.detached(priority: .utility) {
+            PDFCache.prune()
+        }
+
         Task { [weak self] in
             await self?.detectCompiler()
         }
-        // Launch behavior: check project history
+
         if historyManager.hasHistory, let lastURL = historyManager.lastProject {
             loadFile(url: lastURL)
-        } else {
-            showWelcome = true
         }
-        // Start auto-save if enabled
+
         startAutoSaveIfNeeded()
     }
 
@@ -84,6 +105,7 @@ final class EditorViewModel {
         } else {
             compilerStatus = .notFound
         }
+        LaunchMetrics.mark("engine.ready")
     }
 
     // MARK: - Install Tectonic
@@ -161,6 +183,7 @@ final class EditorViewModel {
             savedText = content
             clearPDFPreview()
             errorMessage = nil
+            showWelcome = false
             historyManager.recordProject(url)
         } catch {
             // File no longer accessible, remove from history

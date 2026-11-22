@@ -83,6 +83,7 @@ struct myleafApp: App {
     @FocusedValue(\.editorViewModel) var viewModel
 
     init() {
+        LaunchMetrics.mark("app.init")
         AntiDebug.apply()
         MemoryMonitor.shared.start()
     }

@@ -693,6 +693,56 @@ CoreUI image data   2.3 MB
 - `InstallationChecker` 清理前返回 2 份（0.1 + DerivedData 1.0），清理后返回 1 份（0.1）
 - 设置页可显示副本列表与版本
 
+### 5.7 冷启动优化（0.1）
+
+**首次测量**（Debug，`LaunchMetrics` 写入 `~/Library/Logs/myleaf/launch-*.log`）：
+
+```text
+app.init: -0.000s
+viewModel.init.begin: 0.134s
+firstWindow: 0.148s
+tools.ready: 0.167s
+viewModel.init.begin: 0.167s   ← SwiftUI 再次构造 @State 初始值
+engine.ready: 0.194s
+engine.ready: 0.194s           ← 两套引擎探测
+```
+
+发现两个问题：
+
+1. `ToolManager.shared` 在启动路径上同步执行 `tectonic/pandoc --version`
+2. SwiftUI 会多次求值 `@State` 初始值；`EditorViewModel.init` 里的副作用被执行两次
+   （引擎探测、自动保存、历史加载）
+
+**改动**
+
+- `ToolManager`
+  - `refreshAll()` 先立即标记 `.checking`，再用 `Task.detached` 探测版本
+  - `EditorViewModel.toolManager` 改为计算属性，首次访问（设置/安装）才初始化
+- `EditorViewModel`
+  - `init` 只保留轻量状态
+  - 新增 `start()`，由 `ContentView.task` 调用一次；引擎探测、历史恢复、
+    自动保存、PDF 缓存清理都移到这里
+  - SwiftUI 丢弃的初始值不会执行 `start()`，避免重复探测
+- I/O 移出主线程
+  - `PDFCache.prune()`
+  - `MemoryMonitor` 的日志目录扫描、历史 JSONL 回放
+  - `LaunchMetrics` 文件写入
+- 启动埋点：`app.init / viewModel.init / firstWindow / viewModel.start / tools.ready / engine.ready`
+
+**结果**（Release，第二次及以后启动）：
+
+```text
+app.init: -0.000s
+viewModel.init.begin: 0.121s
+firstWindow: 0.135s
+viewModel.start: 0.156s
+engine.ready: 0.172s
+```
+
+- 首窗口约 **0.135s**（优化前 0.148–0.167s）
+- `engine.ready` 只出现一次
+- `tools.ready` 不再出现在启动阶段（延迟到首次打开设置）
+
 ---
 
 ## 6. 验证矩阵
@@ -714,6 +764,9 @@ CoreUI image data   2.3 MB
 | 撤销栈上限 | 代码审查 + 编辑器实际使用 | `levelsOfUndo = 100` |
 | 空闲内存构成 | `footprint -p` + `vmmap -summary` | 69 MB：IOSurface 28 MB、malloc 27 MB、框架/资源 14 MB |
 | 性能面板 | 设置 → Performance | 内存曲线 + 编译阶段堆叠图 + 最近构建列表 |
+| 冷启动 | `~/Library/Logs/myleaf/launch-*.log` | 首窗口 0.135s，engine 探测一次 |
+| 升级覆盖 | pkg preinstall 临时目录测试 | 旧副本删除、无关应用保留 |
+| 多版本检查 | InstallationChecker | 清理前 2 份，清理后 1 份 |
 | Release 启动 | `open` + `pgrep` + 截图 | 正常，AntiDebug 未误杀 |
 | DMG 签名 | `codesign --verify --deep --strict` | 通过 |
 | DMG 启动 | 挂载后运行 | 正常 |
@@ -745,8 +798,9 @@ CoreUI image data   2.3 MB
 | v1.4 提交 | PDF 文件缓存 + 撤销栈上限（降低大文档/大 PDF 峰值） |
 | v1.5 提交 | 设置页选项卡 + Performance 可视化面板（内存曲线 / 编译阶段耗时） |
 | v1.5.1 提交 | 修复欢迎页无法打开 Settings；恢复屏幕外窗口 |
+| 0.1 提交 | 升级覆盖 + 多版本检查 + 冷启动优化 |
 
-标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）→ `v1.4.0`（内存优化）→ `v1.5.0`（性能面板）→ `v1.5.1`（Settings/窗口修复）。
+标签：`v1.0.0`（首个可分发构建）→ `v1.1.0`（运行时日志 + 调试记录）→ `v1.2.0`（引擎选择 + 阶段耗时）→ `v1.3.0`（内存监控）→ `v1.4.0`（内存优化）→ `v1.5.0`（性能面板）→ `v1.5.1`（Settings/窗口修复）→ `v0.1.0`（首个公开版）。
 
 ---
 

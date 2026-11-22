@@ -24,6 +24,19 @@ a visual Performance panel, and proper install/uninstall packages.
   registered copies found by LaunchServices (including Xcode build outputs),
   and warns when more than one is present.
 
+### Cold start
+- Removed blocking launch work: `ToolManager` version probing now runs off the
+  main thread and is lazily initialized (Settings/install only); engine
+  detection, history restore, auto-save, and PDF-cache pruning run from a
+  single `ContentView.task` start path, eliminating duplicate engine probes
+  caused by SwiftUI re-evaluating the `@State` initializer.
+- Memory-log replay, cache pruning, and launch-metric writes are dispatched to
+  background queues.
+- Launch phases are written to `~/Library/Logs/myleaf/launch-YYYYMMDD.log`
+  (also OSLog category `launch`).
+- Measured warm launch: first window ~0.135 s, engine ready ~0.17 s, with one
+  engine probe instead of two.
+
 ### Compilation
 - Compiles inside the document's own folder, so `\input{}`, images, and
   `.bib` files resolve exactly like a command-line build.

@@ -64,6 +64,7 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 - **Release 加固**：Hardened Runtime、符号剥离、反调试保护（ptrace）
 - **性能面板**：设置 → Performance，包含实时物理内存曲线（1/5/15/30 分钟）、当前/峰值/常驻内存，以及每次编译的阶段耗时（准备 / 引擎 / PDF 缓存）和最近构建列表
 - **内存诊断**：物理内存占用与峰值每 2 秒通过 `task_info` 采样；每分钟写入一条到 `~/Library/Logs/myleaf/memory-*.jsonl`，保留最近 7 天
+- **启动耗时**：`app.init`、`viewModel.start`、`firstWindow`、`engine.ready` 等阶段写入 `~/Library/Logs/myleaf/launch-*.log`
 - **Debug 日志**：视图 / Coordinator / ViewModel 的 Deinit 追踪
 
 ---

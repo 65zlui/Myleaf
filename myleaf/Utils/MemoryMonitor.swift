@@ -38,7 +38,7 @@ final class MemoryMonitor {
 
     private let sampleInterval: TimeInterval = 2
     private let logInterval: TimeInterval = 60
-    private let maxLogDays = 7
+    nonisolated private static let maxLogDays = 7
     private let maxHistoryCount = 900
 
     private var timer: DispatchSourceTimer?
@@ -53,7 +53,7 @@ final class MemoryMonitor {
         return encoder
     }()
 
-    private static let dayFormatter: DateFormatter = {
+    nonisolated private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd"
@@ -68,13 +68,22 @@ final class MemoryMonitor {
         guard !isRunning else { return }
         isRunning = true
 
-        prepareLogDirectory()
-        loadRecentHistory()
-
         // Give AppKit/SwiftUI a few seconds to finish launching before the
         // first persisted sample, otherwise it records a near-empty process.
         nextLogDate = Date().addingTimeInterval(10)
         sampleNow()
+
+        // Directory scan + JSONL replay are disk I/O; keep them off launch.
+        Task.detached(priority: .utility) {
+            Self.prepareLogDirectory()
+            let persisted = Self.loadRecentHistory()
+            guard !persisted.isEmpty else { return }
+            await MainActor.run {
+                let merged = (persisted + self.history)
+                    .sorted { $0.timestamp < $1.timestamp }
+                self.history = Array(merged.suffix(self.maxHistoryCount))
+            }
+        }
 
         let timer = DispatchSource.makeTimerSource(queue: sampleQueue)
         timer.schedule(
@@ -162,7 +171,7 @@ final class MemoryMonitor {
 
     // MARK: - Persistence
 
-    private var logDirectory: URL {
+    nonisolated private static var logDirectory: URL {
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
         return library
             .appendingPathComponent("Logs", isDirectory: true)
@@ -170,28 +179,24 @@ final class MemoryMonitor {
     }
 
     /// Seeds the chart with today's persisted samples after a relaunch.
-    private func loadRecentHistory(limit: Int = 120) {
+    nonisolated private static func loadRecentHistory(limit: Int = 120) -> [MemorySample] {
         let url = logDirectory
-            .appendingPathComponent("memory-\(Self.dayFormatter.string(from: Date())).jsonl")
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            .appendingPathComponent("memory-\(dayFormatter.string(from: Date())).jsonl")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
-        let samples = text
+        return text
             .split(separator: "\n")
             .suffix(limit)
             .compactMap { line in
                 try? decoder.decode(MemorySample.self, from: Data(line.utf8))
             }
             .filter { $0.physicalFootprint > 0 }
-
-        if !samples.isEmpty {
-            history = samples
-        }
     }
 
-    private func prepareLogDirectory() {
+    nonisolated private static func prepareLogDirectory() {
         let fm = FileManager.default
         try? fm.createDirectory(at: logDirectory, withIntermediateDirectories: true)
 
@@ -213,7 +218,7 @@ final class MemoryMonitor {
     }
 
     private func writeLog(_ sample: MemorySample) {
-        let url = logDirectory
+        let url = Self.logDirectory
             .appendingPathComponent("memory-\(Self.dayFormatter.string(from: sample.timestamp)).jsonl")
         logFileURL = url
 

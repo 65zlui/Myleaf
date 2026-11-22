@@ -166,7 +166,10 @@ struct SettingsView: View {
             Spacer()
 
             // Status + action
-            if toolManager.isInstalled(tool) {
+            if case .checking = toolManager.toolStates[tool] {
+                ProgressView()
+                    .controlSize(.small)
+            } else if toolManager.isInstalled(tool) {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
