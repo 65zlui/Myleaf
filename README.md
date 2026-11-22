@@ -153,6 +153,10 @@ Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardene
 - `dist/myleaf-0.1.zip`
 - `dist/SHA256SUMS.txt`
 
+Releases are also automated: push a `v*` tag and
+`.github/workflows/release.yml` builds the same assets on a macOS runner and
+publishes the GitHub Release (no local GitHub login required).
+
 ---
 
 ## Usage Guide

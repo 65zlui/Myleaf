@@ -156,6 +156,8 @@ open myleaf.xcodeproj
 - `dist/myleaf-0.1.zip`
 - `dist/SHA256SUMS.txt`
 
+发布也已自动化：推送 `v*` tag 后，`.github/workflows/release.yml` 会在 macOS runner 上构建并上传同一组产物，无需本地登录 GitHub。
+
 ---
 
 ## 使用指南
