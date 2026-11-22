@@ -660,6 +660,39 @@ CoreUI image data   2.3 MB
 - 欢迎页直接点击 Settings 成功打开（General / Tools / Performance 三个选项卡）
 - 窗口从 `(369,417)` 恢复到 `(0,37)`、`1470×878`，完整可见
 
+### 5.6 升级覆盖与多版本检查（0.1）
+
+**检查结果**
+
+`mdfind` + 常见目录扫描发现机器上有多个 myleaf 副本：
+
+| 版本 | 路径 |
+|------|------|
+| 0.1 | `/Applications/myleaf.app` |
+| 1.0 | 项目 `build/Build/Products/Release/myleaf.app` |
+| 1.0 | `~/Library/Developer/Xcode/DerivedData/.../Debug/myleaf.app` |
+| 1.0 | `/tmp/myleaf-dd/Build/Products/Release/myleaf.app` |
+
+这些构建产物会被 Spotlight 索引，可能被误启动。
+
+**修复**
+
+1. 安装 `preinstall`：
+   - 退出运行中的 myleaf
+   - 删除 `/Applications` 与 `~/Applications` 下的 `myleaf*.app`
+   - 仅删除 bundle id 为 `com.65zlui.myleaf` 的改名副本，保留无关应用
+2. 新增 `InstallationChecker`：
+   - `LSCopyApplicationURLsForBundleIdentifier` + 常见目录扫描
+   - 读取每个副本的版本
+   - 设置 → General → Installation 显示当前版本/路径和所有副本；多份时橙色警告
+3. 清理本机陈旧构建产物（项目 `build/`、Xcode DerivedData、旧 `/tmp` Release）
+
+**验证**
+
+- `preinstall` 在临时目录实测：`myleaf.app`、`myleaf 2.app`、用户目录副本全部删除，`Other.app` 保留
+- `InstallationChecker` 清理前返回 2 份（0.1 + DerivedData 1.0），清理后返回 1 份（0.1）
+- 设置页可显示副本列表与版本
+
 ---
 
 ## 6. 验证矩阵

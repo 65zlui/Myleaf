@@ -85,6 +85,8 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 | 2 | **完整卸载** | `myleaf-uninstaller-0.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
 | 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
+> **升级安装**：`.pkg` 安装前会退出 myleaf，并删除 `/Applications` 与 `~/Applications` 下旧的 `myleaf*.app`，再写入新版本，避免不同版本并存。设置 → General → Installation 会列出机器上仍注册的副本（包括 Xcode 构建产物），发现多份时给出警告。
+
 ### 各路径与处理方式
 
 | 内容 | 路径 | 方式 2（完整卸载） | 方式 3（保留数据） |

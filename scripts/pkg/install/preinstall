@@ -1,7 +1,48 @@
 #!/bin/bash
-# Quit a running copy so Installer can replace /Applications/myleaf.app.
+# Prepare a clean upgrade: quit the running app and remove older myleaf copies
+# from /Applications and the console user's ~/Applications. The installer
+# payload then writes a single fresh /Applications/myleaf.app.
+#
 # Runs as root during installation.
+
+set -u
+
+LOG="/tmp/myleaf-install.log"
+exec >>"$LOG" 2>&1
+echo "=== myleaf install $(/bin/date) ==="
 
 /usr/bin/pkill -x myleaf >/dev/null 2>&1 || true
 
+APP_DIR="${MYLEAF_INSTALL_APP_DIR:-/Applications}"
+
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+USER_HOME=""
+if [ -n "${MYLEAF_INSTALL_USER_HOME:-}" ]; then
+    USER_HOME="$MYLEAF_INSTALL_USER_HOME"
+elif [ -n "${CONSOLE_USER:-}" ] && [ "$CONSOLE_USER" != "root" ]; then
+    USER_HOME="$(/usr/bin/dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null \
+        | /usr/bin/awk '{print $2}')"
+fi
+
+DIRS=("$APP_DIR")
+if [ -n "${USER_HOME:-}" ]; then
+    DIRS+=("$USER_HOME/Applications")
+fi
+
+for dir in "${DIRS[@]}"; do
+    [ -d "$dir" ] || continue
+    for app in "$dir"/myleaf*.app; do
+        [ -d "$app" ] || continue
+        id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" 2>/dev/null || true)"
+        name="$(/usr/bin/basename "$app")"
+        # Remove exact-name copies (including a corrupted one without a valid
+        # Info.plist) and renamed duplicates that still carry our bundle ID.
+        if [ "$name" = "myleaf.app" ] || [ "$id" = "com.65zlui.myleaf" ]; then
+            echo "Removing old copy: $app"
+            /bin/rm -rf "$app"
+        fi
+    done
+done
+
+echo "=== myleaf install prep finished ==="
 exit 0

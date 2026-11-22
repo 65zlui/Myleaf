@@ -82,6 +82,8 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 | 2 | **Full uninstall** | `myleaf-uninstaller-0.1.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
 | 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-0.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
 
+> **Upgrades**: the `.pkg` installer quits myleaf and removes older `myleaf*.app` copies from `/Applications` and `~/Applications` before writing the new bundle, so versions never sit side by side. Settings → General → Installation lists any remaining copies (including Xcode build outputs) and warns when more than one is registered.
+
 ### Paths
 
 | What | Path | Mode 2 (full) | Mode 3 (keep data) |

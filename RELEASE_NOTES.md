@@ -16,6 +16,14 @@ a visual Performance panel, and proper install/uninstall packages.
 - Saved window frames that fall outside the visible screen are recentered or
   clamped at launch and whenever the window becomes key.
 
+### Upgrade safety
+- The `.pkg` preinstall script quits myleaf and removes older `myleaf*.app`
+  copies from `/Applications` and `~/Applications` before the new bundle is
+  written, so versions never sit side by side.
+- Settings → General → Installation shows the running version/path, lists all
+  registered copies found by LaunchServices (including Xcode build outputs),
+  and warns when more than one is present.
+
 ### Compilation
 - Compiles inside the document's own folder, so `\input{}`, images, and
   `.bib` files resolve exactly like a command-line build.

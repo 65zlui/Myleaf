@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var confirmUninstall: ManagedTool?
     @State private var errorMessage: String?
     @State private var selectedTab = 0
+    @State private var installedCopies: [InstalledCopy] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -230,9 +231,99 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         ScrollView {
-            autoSaveSection
-                .padding(16)
+            VStack(alignment: .leading, spacing: 20) {
+                autoSaveSection
+                installationSection
+            }
+            .padding(16)
         }
+    }
+
+    private var installationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Installation", systemImage: "shippingbox")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Current version")
+                        .font(.callout)
+                    Spacer()
+                    Text(currentVersion)
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Bundle")
+                        .font(.callout)
+                    Spacer()
+                    Text(Bundle.main.bundlePath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Divider()
+
+                if installedCopies.count > 1 {
+                    Label("\(installedCopies.count) copies found", systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+
+                    ForEach(installedCopies) { copy in
+                        HStack(spacing: 8) {
+                            Text(copy.displayVersion)
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 54, alignment: .leading)
+
+                            Text(copy.url.path)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+
+                            Spacer()
+
+                            Button("Reveal") {
+                                NSWorkspace.shared.activateFileViewerSelecting([copy.url])
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+
+                    Text("Remove older copies to prevent launching a different version.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                } else if installedCopies.count == 1 {
+                    Label("Single installation", systemImage: "checkmark.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.green)
+                } else {
+                    Text("Run Refresh to scan installed copies.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Refresh") {
+                        installedCopies = InstallationChecker.copies()
+                    }
+                    .controlSize(.small)
+                }
+            }
+            .padding(12)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .task {
+            installedCopies = InstallationChecker.copies()
+        }
+    }
+
+    private var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
 
     private var toolsTab: some View {
