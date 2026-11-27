@@ -119,7 +119,11 @@ struct LaTeXEditorView: NSViewRepresentable {
         }
 
         func applyHighlighting() {
-            guard let textView = textView else { return }
+            // Never rewrite attributes while an input method (e.g. Pinyin) has
+            // marked text: changing the storage and resetting the selection
+            // mid-composition drops or duplicates characters. Highlighting
+            // resumes on the first keystroke after the text is committed.
+            guard let textView = textView, !textView.hasMarkedText() else { return }
             let source = textView.string
             let isDark = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let baseFont = NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)

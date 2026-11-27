@@ -12,7 +12,9 @@ struct ContentView: View {
                         viewModel.newDocument()
                     },
                     onSelectTemplate: {
-                        viewModel.showWelcome = false
+                        // Keep the welcome screen until a template is actually
+                        // chosen: cancelling the picker must not drop the user
+                        // into an empty "Untitled" editor.
                         viewModel.showTemplatePicker = true
                     },
                     onOpenFile: {
@@ -34,8 +36,8 @@ struct ContentView: View {
         }
         .sheet(isPresented: $viewModel.showTemplatePicker) {
             TemplatePicker { template in
+                // applyTemplate leaves the welcome screen itself.
                 viewModel.applyTemplate(template)
-                viewModel.showWelcome = false
             }
         }
         .sheet(isPresented: $viewModel.showSettings) {

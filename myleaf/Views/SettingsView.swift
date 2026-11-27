@@ -181,9 +181,15 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .tint(.red)
                 }
-            } else if toolManager.isWorking && toolManager.workingTool == tool {
-                ProgressView()
-                    .controlSize(.small)
+            } else if isInstalling(tool) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(installStatus(for: tool))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             } else {
                 Button("Install") {
                     switch tool {
@@ -193,6 +199,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
+                .disabled(isInstalling(.tectonic) || isInstalling(.pandoc))
             }
         }
         .padding(12)
@@ -337,6 +344,27 @@ struct SettingsView: View {
             }
             .padding(16)
         }
+    }
+
+    // MARK: - Install State
+
+    /// Installation runs through the view model's installers (the same ones the
+    /// in-editor banner shows). Without this, tapping Install inside this sheet
+    /// looked like nothing happened: the progress banner lives behind the sheet.
+    private func isInstalling(_ tool: ManagedTool) -> Bool {
+        switch tool {
+        case .tectonic: return viewModel.installer.isInstalling
+        case .pandoc: return viewModel.isInstallingPandoc
+        }
+    }
+
+    private func installStatus(for tool: ManagedTool) -> String {
+        let status: String
+        switch tool {
+        case .tectonic: status = viewModel.installer.statusMessage
+        case .pandoc: status = viewModel.pandocInstallStatus
+        }
+        return status.isEmpty ? "Installing…" : status
     }
 
     // MARK: - Actions

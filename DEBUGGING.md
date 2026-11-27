@@ -445,6 +445,50 @@ prepare: 0.002s engine: 0.333s pdf: 0.000s total: 0.335s
 
 ---
 
+### 3.15 UI 交互与状态问题（编译串档、欢迎页、输入法、安装反馈）
+
+**定位**
+
+按“UI 交互 / 状态”逐条走查 ViewModel 与视图之间的状态流，确认了 6 个问题：
+
+1. **编译结果串档**：`compile()` 编译期间用 ⌘N / ⌘O / ⇧⌘N 切换文档，旧编译完成后仍会写 `pdfDocument`、`errorMessage`、`lastBuildLog`，新文档会显示上一份文档的 PDF 或错误。`isCompiling` 也会被旧任务提前清掉，可能压掉新编译的转圈状态。
+2. **模板选择取消后状态丢失**：欢迎页点 “Choose Template” 时先 `showWelcome = false`，再弹 sheet；点 Cancel 后欢迎页已经没了，用户被丢进一个空的 Untitled 编辑器。
+3. **欢迎页快捷键操作隐藏文档**：欢迎页上 ⌘S / ⌘B 仍然可用，会保存/编译隐藏的默认模板，界面上看不出任何反馈。
+4. **中文输入法组词被打断**：`textDidChange` 每次按键都同步执行 `applyHighlighting()`，其中会重写 textStorage 属性并 `setSelectedRange`。拼音/日文输入法在 `hasMarkedText()` 期间被改属性、挪选区，会出现丢字、重复或候选框错乱。
+5. **Settings 里安装无反馈**：安装进度横幅挂在编辑器里，被 Settings sheet 挡住；`ToolManager.isWorking` 从未被设置为 true，Tool 行一直显示 Install 按钮，看起来“点了没反应”。
+6. **构建日志跨文档残留**：切换文档后 “Show Build Log” 仍展示上一份文档的日志（`lastBuildLog` 未清理）。
+
+**修复**
+
+- 新增 `activeCompileID: UUID?`：编译开始时落 token 并快照 `source` / `documentURL`；文档变化（`newDocument` / `loadFile` / `applyTemplate`）通过 `prepareForDocumentChange()` 清空 token、`isCompiling`、`compilationPhase` 和本文件的构建日志；`compile()` 的 `defer` 只在 token 仍匹配时回收状态，旧编译的结果在赋值前被丢弃。
+- 欢迎页选择模板时不再提前隐藏；只有 `applyTemplate()` 真正套用模板后才离开欢迎页，Cancel 留在欢迎页。
+- `showWelcome == true` 时菜单里的 Save / Save As / Export Word / Compile / Show Build Log 禁用，ViewModel 的 `compile` / `saveDocument` 也加 guard。
+- `applyHighlighting()` 在 `textView.hasMarkedText()` 时直接返回；组词提交后的下一次按键恢复高亮。
+- Settings 的工具行改为读取真实安装状态（`installer.isInstalling` / `isInstallingPandoc`）并显示状态文案，任一工具安装期间禁用 Install。
+- 提取 `LaTeXCompiling` 协议，生产用 `LaTeXCompiler`，测试用 `StubCompiler` 控制返回时机。
+
+**排除的误报（先做实验再下结论）**
+
+- 属性级高亮**不会**污染撤销栈：真实窗口下 `insertText` 后 `canUndo == true`，仅改 textStorage 属性后 `canUndo == false`。
+- PDFView 重新赋值 `document` 后**会保留当前页索引**（2 页文档滚到第 2 页，换新 `PDFDocument` 后仍是 index 1），不需要额外恢复页码。
+
+**验证**
+
+- 新增 `EditorViewModelStateTests` 两个用例：编译中切换文档后，旧结果（失败日志）不得写入新文档；欢迎页 `compile()` 必须被忽略。
+- 全量测试 51 → **53 个全部通过**；Debug 构建无错误/警告。
+
+```text
+✔ Test documentSwitchDiscardsInFlightCompileResult() passed after 0.879 seconds.
+✔ Test compileIsIgnoredOnWelcomeScreen() passed after 0.001 seconds.
+✔ Test run with 53 tests passed after 2.221 seconds.
+** TEST SUCCEEDED **
+```
+
+> 未处理：新建/打开/套模板时若当前文档有未保存修改，仍会直接丢失（无确认弹窗）。
+> 自动保存只覆盖已有 `fileURL` 的文档，这个问题建议下一轮补上“Discard changes?”确认。
+
+---
+
 ## 4. 发布构建与打包
 
 `scripts/package-app.sh` 固化整个流程：
@@ -778,7 +822,7 @@ engine.ready: 0.172s
 | DMG 内容 | `hdiutil attach` | app + Applications 链接 + 两个卸载包 |
 | 应用图标 | 构建产物 `AppIcon.icns` + 截图 | 已生效 |
 
-测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）→ 50（引擎版本比较与阶段耗时断言）→ 51（内存采样）。
+测试数量：43（基线）→ 47（编译与 ViewModel 集成）→ 48（运行时日志存储）→ 50（引擎版本比较与阶段耗时断言）→ 51（内存采样）→ 53（UI 状态机回归）。
 
 ---
 
@@ -813,3 +857,5 @@ engine.ready: 0.172s
 - **UI 自动化**：当前机器未授予辅助功能权限，XCUITest 无法交互；已用 ViewModel 集成测试替代。
 - **旧版引擎升级**：当前只会选择“已安装的最新版”；如果机器上只有应用内 0.16.x，编译仍会慢。后续可在设置页增加“检查 Tectonic 更新”按钮。
 - **监控深化**：本次只把阶段耗时写入 Build Log；OSSignposter 时间线与 JSONL 指标尚未接入，适合作为下一阶段。
+- **未保存修改确认**：新建 / 打开 / 套用模板会直接丢弃当前未保存内容（自动保存只覆盖已有 `fileURL` 的文档），需要补 “Discard changes?” 确认。
+- **废弃编译不中断**：文档切换后旧编译仍在后台跑完再丢弃结果（`Process` 目前没有取消句柄）；如需省电/省 CPU，可在 `LaTeXCompiler` 上增加取消支持。

@@ -130,7 +130,14 @@ struct CompilationOutput {
     let timings: CompilationTimings
 }
 
-final class LaTeXCompiler {
+/// Abstraction over the LaTeX engine used by `EditorViewModel`. Production uses
+/// `LaTeXCompiler`; tests substitute a deterministic stub.
+protocol LaTeXCompiling {
+    func detectEngine() -> TeXEngine?
+    func compile(source: String, documentURL: URL?) async -> Result<CompilationOutput, CompilationError>
+}
+
+final class LaTeXCompiler: LaTeXCompiling {
 
     /// Seconds before a runaway compilation is terminated.
     private let compilationTimeout: TimeInterval = 300
