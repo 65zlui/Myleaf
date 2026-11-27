@@ -39,9 +39,14 @@ final class EditorViewModel {
     /// during app launch; Settings or an install action will access it later.
     var toolManager: ToolManager { ToolManager.shared }
     let historyManager = ProjectHistoryManager.shared
-    private let compiler = LaTeXCompiler()
+    private let compiler: any LaTeXCompiling
     private var savedText: String = ""
     private var autoSaveTask: Task<Void, Never>?
+
+    /// Identifies the compile that is still allowed to update the UI. Replaced
+    /// when a compile starts and cleared when the document changes, so a slow
+    /// build of a previous document cannot overwrite the new document's state.
+    private var activeCompileID: UUID?
 
     var windowTitle: String {
         let name = document.fileURL?.lastPathComponent ?? "Untitled"
@@ -55,7 +60,8 @@ final class EditorViewModel {
 
     private var hasStarted = false
 
-    init() {
+    init(compiler: any LaTeXCompiling = LaTeXCompiler()) {
+        self.compiler = compiler
         LaunchMetrics.mark("viewModel.init.begin")
         savedText = document.sourceText
         // Side effects (engine detection, history restore, cache pruning) are
@@ -126,6 +132,7 @@ final class EditorViewModel {
     // MARK: - Templates
 
     func applyTemplate(_ template: Template) {
+        prepareForDocumentChange()
         document = LaTeXDocument(sourceText: template.content)
         clearPDFPreview()
         errorMessage = nil
@@ -179,6 +186,7 @@ final class EditorViewModel {
     func loadFile(url: URL) {
         do {
             let content = try Self.readText(from: url)
+            prepareForDocumentChange()
             document = LaTeXDocument(sourceText: content, fileURL: url)
             savedText = content
             clearPDFPreview()
@@ -193,6 +201,7 @@ final class EditorViewModel {
     }
 
     func newDocument() {
+        prepareForDocumentChange()
         document = LaTeXDocument()
         clearPDFPreview()
         errorMessage = nil
@@ -206,6 +215,19 @@ final class EditorViewModel {
         // Cached PDFs are pruned by PDFCache (max 3) rather than deleted here:
         // the old PDFDocument may still be referenced by PDFView until its next
         // SwiftUI update. Keeping the file briefly avoids a deleted-file race.
+    }
+
+    /// Invalidates any in-flight compile and drops build state that belongs to
+    /// the previous document. Compilation history is intentionally kept — the
+    /// Performance panel shows timing history across documents.
+    private func prepareForDocumentChange() {
+        activeCompileID = nil
+        isCompiling = false
+        compilationPhase = ""
+        lastBuildLog = nil
+        lastBuildLogFile = nil
+        lastCompilationDuration = nil
+        showBuildLog = false
     }
 
     func newFromTemplate() {
@@ -225,6 +247,7 @@ final class EditorViewModel {
     }
 
     func saveDocument() {
+        guard !showWelcome else { return }
         if let url = document.fileURL {
             writeToFile(url: url)
         } else {
@@ -233,6 +256,7 @@ final class EditorViewModel {
     }
 
     func saveDocumentAs() {
+        guard !showWelcome else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "tex")].compactMap { $0 }
         panel.nameFieldStringValue = document.fileURL?.lastPathComponent ?? "document.tex"
@@ -348,18 +372,29 @@ final class EditorViewModel {
     // MARK: - Compilation
 
     func compile() {
-        guard !isCompiling else { return }
+        guard !isCompiling, !showWelcome else { return }
 
+        let compileID = UUID()
+        activeCompileID = compileID
         isCompiling = true
         errorMessage = nil
         compilationPhase = "Preparing…"
-        compileLogger.info("Compile requested for \(self.document.fileURL?.lastPathComponent ?? "untitled", privacy: .public)")
+
+        // Snapshot the document: if the user switches files while the engine is
+        // running, the result below belongs to this snapshot only.
+        let source = document.sourceText
+        let documentURL = document.fileURL
+        compileLogger.info("Compile requested for \(documentURL?.lastPathComponent ?? "untitled", privacy: .public)")
 
         Task { [weak self] in
             guard let self else { return }
             defer {
-                self.isCompiling = false
-                self.compilationPhase = ""
+                // A superseded compile must not clear the state of a newer one.
+                if self.activeCompileID == compileID {
+                    self.isCompiling = false
+                    self.compilationPhase = ""
+                    self.activeCompileID = nil
+                }
             }
 
             // Engine detection runs at launch; make sure it has finished (or
@@ -368,6 +403,7 @@ final class EditorViewModel {
                 self.compilationPhase = "Detecting LaTeX engine…"
                 await self.detectCompiler()
             }
+            guard self.activeCompileID == compileID else { return }
             if case .notFound = self.compilerStatus {
                 self.errorMessage = CompilationError.engineNotFound.errorDescription
                 self.recordCompilation(CompilationRecord(
@@ -391,10 +427,14 @@ final class EditorViewModel {
             self.compilationPhase = "Running LaTeX engine…"
             let compileStartedAt = Date()
             let result = await self.compiler.compile(
-                source: self.document.sourceText,
-                documentURL: self.document.fileURL
+                source: source,
+                documentURL: documentURL
             )
             let wallDuration = Date().timeIntervalSince(compileStartedAt)
+
+            // The document changed (new/open/template) while the engine ran:
+            // this output no longer describes what the user is looking at.
+            guard self.activeCompileID == compileID else { return }
 
             self.compilationPhase = "Loading PDF…"
 

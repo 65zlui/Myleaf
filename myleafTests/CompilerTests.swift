@@ -196,3 +196,77 @@ struct EditorViewModelCompileTests {
         }
     }
 }
+
+/// Deterministic stand-in for the process-based engine, so the state-machine
+/// tests below do not need Tectonic or a few hundred milliseconds of real work.
+private final class StubCompiler: LaTeXCompiling {
+    let delay: TimeInterval
+    let result: Result<CompilationOutput, CompilationError>
+
+    init(delay: TimeInterval, result: Result<CompilationOutput, CompilationError>) {
+        self.delay = delay
+        self.result = result
+    }
+
+    func detectEngine() -> TeXEngine? {
+        TeXEngine(kind: .tectonic, url: URL(fileURLWithPath: "/usr/bin/true"), version: "0.0-stub")
+    }
+
+    func compile(source: String, documentURL: URL?) async -> Result<CompilationOutput, CompilationError> {
+        if delay > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+        return result
+    }
+}
+
+/// State-machine tests around `EditorViewModel` document switching and the
+/// welcome screen. They use `StubCompiler` so results arrive on a controlled
+/// timeline.
+@MainActor
+@Suite(.serialized)
+struct EditorViewModelStateTests {
+
+    @Test func documentSwitchDiscardsInFlightCompileResult() async throws {
+        let stub = StubCompiler(
+            delay: 0.3,
+            result: .failure(.compilationFailed(log: "stale build log", logFile: nil))
+        )
+        let viewModel = EditorViewModel(compiler: stub)
+        await viewModel.detectCompiler()
+
+        viewModel.newDocument()
+        viewModel.document.sourceText = "first document"
+        viewModel.compile()
+        #expect(viewModel.isCompiling)
+
+        // Simulate ⌘N / ⌘O while the previous document is still compiling.
+        viewModel.lastBuildLog = "previous document log"
+        viewModel.newDocument()
+        #expect(viewModel.isCompiling == false)
+        #expect(viewModel.lastBuildLog == nil)
+
+        // Let the superseded compile finish; it must not touch the new document.
+        try await Task.sleep(nanoseconds: 800_000_000)
+
+        #expect(viewModel.isCompiling == false)
+        #expect(viewModel.pdfDocument == nil)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.lastBuildLog == nil)
+    }
+
+    @Test func compileIsIgnoredOnWelcomeScreen() {
+        let stub = StubCompiler(
+            delay: 0,
+            result: .failure(.compilationFailed(log: "should not run", logFile: nil))
+        )
+        let viewModel = EditorViewModel(compiler: stub)
+        #expect(viewModel.showWelcome)
+
+        viewModel.compile()
+
+        #expect(viewModel.isCompiling == false)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.lastBuildLog == nil)
+    }
+}

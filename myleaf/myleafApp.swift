@@ -118,11 +118,13 @@ struct myleafApp: App {
                     viewModel?.saveDocument()
                 }
                 .keyboardShortcut("s", modifiers: .command)
+                .disabled(viewModel?.showWelcome ?? true)
 
                 Button("Save As...") {
                     viewModel?.saveDocumentAs()
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(viewModel?.showWelcome ?? true)
 
                 Divider()
 
@@ -136,6 +138,7 @@ struct myleafApp: App {
                     viewModel?.exportWord()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(viewModel?.showWelcome ?? true)
             }
 
             // Build menu
@@ -144,13 +147,13 @@ struct myleafApp: App {
                     viewModel?.compile()
                 }
                 .keyboardShortcut("b", modifiers: .command)
-                .disabled(viewModel?.isCompiling == true)
+                .disabled(viewModel?.isCompiling == true || (viewModel?.showWelcome ?? true))
 
                 Button("Show Build Log") {
                     viewModel?.showBuildLogPanel()
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
-                .disabled(viewModel?.lastBuildLog == nil)
+                .disabled(viewModel?.lastBuildLog == nil || (viewModel?.showWelcome ?? true))
             }
 
             // myleaf menu > Settings
