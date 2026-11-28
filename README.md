@@ -88,6 +88,23 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 
 > **Upgrades**: the `.pkg` installer quits myleaf and removes older `myleaf*.app` copies from `/Applications` and `~/Applications` before writing the new bundle, so versions never sit side by side. Settings → General → Installation lists any remaining copies (including Xcode build outputs) and warns when more than one is registered.
 
+### Homebrew Cask
+
+```bash
+brew tap 65zlui/myleaf https://github.com/65zlui/Myleaf
+brew trust 65zlui/myleaf        # Homebrew 7+ only; skip on older versions
+brew install --cask myleaf
+```
+
+The cask downloads the same DMG as the GitHub release and strips its quarantine
+attribute after installation, so the ad-hoc-signed app launches without a
+Gatekeeper prompt. If myleaf was previously installed from the `.pkg`/DMG,
+remove `/Applications/myleaf.app` first, or add `--adopt`.
+
+Upgrade with `brew upgrade --cask myleaf` (or Settings → General → Updates).
+Uninstall with `brew uninstall --cask myleaf`; add `--zap` to also remove user
+data, downloaded tools, logs, and caches.
+
 ### Paths
 
 | What | Path | Mode 2 (full) | Mode 3 (keep data) |
@@ -106,7 +123,7 @@ Your `.tex` projects and system TeX/Pandoc installations are **never** touched i
 
 > **First launch**: The app will automatically detect available LaTeX engines. If none are found, you can install Tectonic with one click in Settings (~25MB download).
 
-> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the installer or app, right-click it and choose **Open**.
+> **Gatekeeper note**: Release builds are ad-hoc signed (no paid Developer ID). If macOS blocks the installer or app, right-click it and choose **Open**. Installing with the Homebrew Cask below avoids the prompt, because the cask removes the quarantine flag automatically.
 
 > **Mode 3** keeps recent-project history, the auto-save setting, downloaded tools, and build logs, so reinstalling restores your setup.
 

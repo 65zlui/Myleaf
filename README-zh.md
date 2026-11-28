@@ -91,6 +91,22 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 > **升级安装**：`.pkg` 安装前会退出 myleaf，并删除 `/Applications` 与 `~/Applications` 下旧的 `myleaf*.app`，再写入新版本，避免不同版本并存。设置 → General → Installation 会列出机器上仍注册的副本（包括 Xcode 构建产物），发现多份时给出警告。
 
+### Homebrew Cask
+
+```bash
+brew tap 65zlui/myleaf https://github.com/65zlui/Myleaf
+brew trust 65zlui/myleaf        # 仅 Homebrew 7+ 需要；旧版可跳过
+brew install --cask myleaf
+```
+
+cask 使用与 GitHub Release 相同的 DMG，并在安装后自动清除 quarantine 标记，
+所以 ad-hoc 签名的应用首次启动不会再被 Gatekeeper 拦截。如果之前用
+`.pkg`/DMG 安装过，请先删除 `/Applications/myleaf.app`，或安装时加 `--adopt`。
+
+升级：`brew upgrade --cask myleaf`（或设置 → General → Updates）。
+卸载：`brew uninstall --cask myleaf`；加 `--zap` 可同时清除用户数据、下载的工具、
+日志和缓存。
+
 ### 各路径与处理方式
 
 | 内容 | 路径 | 方式 2（完整卸载） | 方式 3（保留数据） |
@@ -109,7 +125,7 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 > **首次启动**：应用会自动检测 LaTeX 引擎。如未安装，可在设置中一键安装 Tectonic（约 25MB）。
 
-> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止安装包或应用，请右键选择「打开」。
+> **Gatekeeper 提示**：发布版本使用 ad-hoc 签名（无付费 Developer ID）。如 macOS 阻止安装包或应用，请右键选择「打开」。使用下面的 Homebrew Cask 安装可自动清除 quarantine，不会再弹此提示。
 
 > **方式 3 的作用**：保留最近项目历史、自动保存开关、已下载的工具和编译日志，重新安装后即可恢复原有使用状态。
 
