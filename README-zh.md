@@ -61,6 +61,7 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 - **最近项目**：记录最近打开的 10 个文件
 - **自动保存**：每 30 秒自动保存（可开关）
 - **启动恢复**：自动打开上次编辑的项目
+- **应用内更新**：设置 → General → Updates 检查 GitHub Release，一键下载 `.pkg` 并拉起安装器（最后的安装仍需 macOS 管理员授权）
 
 ### 🛡️ 安全与调试
 - **Release 加固**：Hardened Runtime、符号剥离、反调试保护（ptrace）
@@ -84,9 +85,9 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 | # | 方式 | 包 | 效果 |
 |---|------|-----|------|
-| 1 | **完整安装** | `myleaf-0.2.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
-| 2 | **完整卸载** | `myleaf-uninstaller-0.2.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
-| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.2.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+| 1 | **完整安装** | `myleaf-0.3.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-0.3.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.3.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
 > **升级安装**：`.pkg` 安装前会退出 myleaf，并删除 `/Applications` 与 `~/Applications` 下旧的 `myleaf*.app`，再写入新版本，避免不同版本并存。设置 → General → Installation 会列出机器上仍注册的副本（包括 Xcode 构建产物），发现多份时给出警告。
 
@@ -151,11 +152,11 @@ open myleaf.xcodeproj
 
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
-- `dist/myleaf-0.2.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-0.2.pkg` —— 完整卸载（应用 + 数据）
-- `dist/myleaf-uninstaller-keepdata-0.2.pkg` —— 只卸载应用，保留用户数据
-- `dist/myleaf-0.2.dmg` —— 拖拽安装镜像（内含两个卸载包）
-- `dist/myleaf-0.2.zip`
+- `dist/myleaf-0.3.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-0.3.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-0.3.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-0.3.dmg` —— 拖拽安装镜像（内含两个卸载包）
+- `dist/myleaf-0.3.zip`
 - `dist/SHA256SUMS.txt`
 
 发布也已自动化：推送 `v*` tag 后，`.github/workflows/release.yml` 会在 macOS runner 上构建并上传同一组产物，无需本地登录 GitHub。

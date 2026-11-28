@@ -1,3 +1,32 @@
+# myleaf 0.3.0
+
+**In-app updates.** Settings → General → Updates can now check GitHub for a
+newer release and download its installer without leaving the app.
+
+## Highlights
+
+### Updates
+- **Check for Updates** queries the latest GitHub release and compares it with
+  the running version. Version comparison is numeric-aware, so "0.3" and
+  "0.3.0" are treated as equal.
+- When an update exists, its release notes are shown inline with a link to the
+  GitHub release.
+- **Download & Install** fetches the release's `.pkg`, strips the quarantine
+  flag, and opens it with Installer. The package's preinstall script quits
+  myleaf and removes older copies before installing the new version.
+- macOS still asks for admin approval; myleaf never silently replaces its own
+  bundle. The ad-hoc-signed build therefore follows the same install path as a
+  manual double-click.
+
+## Packages
+
+- `myleaf-0.3.pkg` — installer (recommended)
+- `myleaf-0.3.dmg` — drag-to-Applications image (includes uninstallers)
+- `myleaf-0.3.zip`
+- `myleaf-uninstaller-0.3.pkg` / `myleaf-uninstaller-keepdata-0.3.pkg`
+
+---
+
 # myleaf 0.2.0
 
 **Search + state fixes.** Adds find-in-editor and find-in-PDF, and repairs a
