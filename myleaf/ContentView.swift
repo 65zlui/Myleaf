@@ -92,15 +92,29 @@ struct ContentView: View {
             // Main split view
             HSplitView {
                 // Left: LaTeX editor with syntax highlighting
-                LaTeXEditorView(text: $viewModel.document.sourceText)
-                    .frame(minWidth: 300)
+                LaTeXEditorView(
+                    text: $viewModel.document.sourceText,
+                    findRequest: viewModel.editorFindRequest
+                )
+                .frame(minWidth: 300)
 
                 // Right: PDF preview
                 ZStack {
                     if let pdf = viewModel.pdfDocument {
-                        PDFPreviewView(pdfDocument: pdf)
+                        PDFPreviewView(pdfDocument: pdf, searchState: viewModel.pdfSearch)
                     } else {
                         placeholderView
+                    }
+
+                    if viewModel.pdfSearch.isPresented {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                PDFSearchBar(state: viewModel.pdfSearch)
+                            }
+                            Spacer()
+                        }
+                        .padding(8)
                     }
 
                     if viewModel.isCompiling {
@@ -228,6 +242,12 @@ struct ContentView: View {
             }
             .disabled(viewModel.isCompiling || viewModel.compilerStatus == .notFound)
             .help("Compile LaTeX (\u{2318}B)")
+
+            Button(action: { viewModel.findInPDF() }) {
+                Label("Find in PDF", systemImage: "magnifyingglass")
+            }
+            .disabled(viewModel.pdfDocument == nil)
+            .help("Search the PDF preview (\u{21e7}\u{2318}F)")
 
             Button(action: { viewModel.showBuildLogPanel() }) {
                 Label("Build Log", systemImage: "doc.text.magnifyingglass")

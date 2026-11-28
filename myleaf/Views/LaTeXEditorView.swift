@@ -7,6 +7,10 @@ import AppKit
 struct LaTeXEditorView: NSViewRepresentable {
     @Binding var text: String
     var fontSize: CGFloat = 13
+    /// Incremented by the view model to ask for the find bar. Using a trigger
+    /// instead of the responder chain means ⌘F works even when the editor is
+    /// not the current first responder.
+    var findRequest: Int = 0
 
     func makeNSView(context: Context) -> NSScrollView {
         // Create scroll view
@@ -45,11 +49,14 @@ struct LaTeXEditorView: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.smartInsertDeleteEnabled = false
         textView.backgroundColor = .clear
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
 
         scrollView.documentView = textView
 
         context.coordinator.textView = textView
         context.coordinator.parent = self
+        context.coordinator.lastFindRequest = findRequest
 
         // Re-color tokens when the user switches between light and dark mode.
         textView.appearanceDidChange = { [weak coordinator = context.coordinator] in
@@ -63,6 +70,12 @@ struct LaTeXEditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? LaTeXTextView else { return }
         context.coordinator.parent = self
+
+        if findRequest != context.coordinator.lastFindRequest {
+            context.coordinator.lastFindRequest = findRequest
+            context.coordinator.showFindBar()
+        }
+
         guard textView.string != text else { return }
         context.coordinator.updateTextWithoutResettingCursor(text)
     }
@@ -76,6 +89,7 @@ struct LaTeXEditorView: NSViewRepresentable {
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: LaTeXEditorView
         weak var textView: LaTeXTextView?
+        var lastFindRequest = 0
         private var isUpdatingProgrammatically = false
 
         init(_ parent: LaTeXEditorView) {
@@ -116,6 +130,17 @@ struct LaTeXEditorView: NSViewRepresentable {
                 scrollView.contentView.scroll(to: origin)
                 scrollView.reflectScrolledClipView(scrollView.contentView)
             }
+        }
+
+        /// Makes the editor first responder and opens NSTextView's native find
+        /// bar (`usesFindBar`), which provides incremental search, next/previous,
+        /// match highlighting and replace.
+        func showFindBar() {
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            let item = NSMenuItem()
+            item.tag = Int(NSFindPanelAction.showFindPanel.rawValue)
+            textView.performFindPanelAction(item)
         }
 
         func applyHighlighting() {

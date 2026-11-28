@@ -141,6 +141,23 @@ struct myleafApp: App {
                 .disabled(viewModel?.showWelcome ?? true)
             }
 
+            // Edit menu: find in the editor or in the PDF preview.
+            CommandGroup(after: .pasteboard) {
+                Divider()
+
+                Button("Find in Editor...") {
+                    viewModel?.findInEditor()
+                }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(viewModel?.showWelcome ?? true)
+
+                Button("Find in PDF...") {
+                    viewModel?.findInPDF()
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(viewModel?.pdfDocument == nil)
+            }
+
             // Build menu
             CommandMenu("Build") {
                 Button("Compile") {

@@ -35,6 +35,10 @@ final class EditorViewModel {
 
     let installer = TectonicInstaller()
     let exportService = ExportService()
+    /// Find state for the PDF preview pane.
+    let pdfSearch = PDFSearchState()
+    /// Incremented to ask the editor to show its find bar.
+    var editorFindRequest = 0
     /// Lazy: ToolManager probes installed tool versions. Do not initialize it
     /// during app launch; Settings or an install action will access it later.
     var toolManager: ToolManager { ToolManager.shared }
@@ -228,6 +232,7 @@ final class EditorViewModel {
         lastBuildLogFile = nil
         lastCompilationDuration = nil
         showBuildLog = false
+        pdfSearch.reset()
     }
 
     func newFromTemplate() {
@@ -369,6 +374,20 @@ final class EditorViewModel {
         }
     }
 
+    // MARK: - Search
+
+    /// Shows the NSTextView find bar in the editor.
+    func findInEditor() {
+        guard !showWelcome else { return }
+        editorFindRequest &+= 1
+    }
+
+    /// Shows the PDF find bar over the preview.
+    func findInPDF() {
+        guard pdfDocument != nil else { return }
+        pdfSearch.present(for: pdfDocument)
+    }
+
     // MARK: - Compilation
 
     func compile() {
@@ -456,6 +475,8 @@ final class EditorViewModel {
                 if let pdf = PDFDocument(url: output.pdfFileURL) {
                     self.pdfDocument = pdf
                     self.pdfCacheURL = output.pdfFileURL
+                    // PDFPreviewView syncs the search state once the new
+                    // document is actually installed in its PDFView.
                     // The previous cache file is retained until PDFCache.prune
                     // keeps the newest 3, avoiding a race with the old PDFView.
                 } else {
