@@ -23,12 +23,14 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 ### 📝 LaTeX 编辑器
 - **语法高亮**：注释、命令、环境、数学模式、括号等分类着色，支持深色/浅色模式
 - **原生编辑体验**：基于 NSTextView，支持撤销/重做、自动缩进、等宽字体；撤销历史限制为 100 级，避免大文档内存无限增长
+- **编辑器查找**：⌘F 打开 NSTextView 原生查找栏，支持增量搜索、上一个/下一个、匹配高亮与替换
 - **智能粘贴**：粘贴时自动过滤富文本格式，即时语法高亮
 
 ### 📄 PDF 预览
 - **实时预览**：PDFKit 驱动的 PDF 渲染，编译完成后即时显示
 - **分栏布局**：可拖拽分割的编辑器 + PDF 预览分栏
 - **文件缓存的 PDF**：编译产物缓存到 `~/Library/Caches/myleaf/pdfs`（最多 3 份），PDFKit 按 URL 打开，避免大 PDF 在内存中保留整份 `Data`
+- **PDF 内查找**：⌘⇧F（或工具栏放大镜）在预览上方打开查找条；全部匹配高亮，回车/上下箭头循环跳转，支持区分大小写
 
 ### 🔧 LaTeX 编译
 - **多引擎支持**：Tectonic（首选）→ pdflatex 自动降级
@@ -82,9 +84,9 @@ myleaf 是使用 SwiftUI 构建的原生 macOS LaTeX 编辑器，提供开箱即
 
 | # | 方式 | 包 | 效果 |
 |---|------|-----|------|
-| 1 | **完整安装** | `myleaf-0.1.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
-| 2 | **完整卸载** | `myleaf-uninstaller-0.1.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
-| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.1.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
+| 1 | **完整安装** | `myleaf-0.2.pkg`，或从 DMG/ZIP 拖拽 | 安装到 `/Applications/myleaf.app` |
+| 2 | **完整卸载** | `myleaf-uninstaller-0.2.pkg`（DMG：`Uninstall myleaf.pkg`） | 删除应用**以及全部用户数据** |
+| 3 | **卸载但保留数据** | `myleaf-uninstaller-keepdata-0.2.pkg`（DMG：`Uninstall myleaf (keep data).pkg`） | 只删除应用；设置、历史、工具、日志保留，供下次安装恢复 |
 
 > **升级安装**：`.pkg` 安装前会退出 myleaf，并删除 `/Applications` 与 `~/Applications` 下旧的 `myleaf*.app`，再写入新版本，避免不同版本并存。设置 → General → Installation 会列出机器上仍注册的副本（包括 Xcode 构建产物），发现多份时给出警告。
 
@@ -149,11 +151,11 @@ open myleaf.xcodeproj
 
 构建通用二进制（`arm64` + `x86_64`），使用 Hardened Runtime 进行 ad-hoc 签名，并生成：
 
-- `dist/myleaf-0.1.pkg` —— 安装包（安装到 `/Applications`）
-- `dist/myleaf-uninstaller-0.1.pkg` —— 完整卸载（应用 + 数据）
-- `dist/myleaf-uninstaller-keepdata-0.1.pkg` —— 只卸载应用，保留用户数据
-- `dist/myleaf-0.1.dmg` —— 拖拽安装镜像（内含两个卸载包）
-- `dist/myleaf-0.1.zip`
+- `dist/myleaf-0.2.pkg` —— 安装包（安装到 `/Applications`）
+- `dist/myleaf-uninstaller-0.2.pkg` —— 完整卸载（应用 + 数据）
+- `dist/myleaf-uninstaller-keepdata-0.2.pkg` —— 只卸载应用，保留用户数据
+- `dist/myleaf-0.2.dmg` —— 拖拽安装镜像（内含两个卸载包）
+- `dist/myleaf-0.2.zip`
 - `dist/SHA256SUMS.txt`
 
 发布也已自动化：推送 `v*` tag 后，`.github/workflows/release.yml` 会在 macOS runner 上构建并上传同一组产物，无需本地登录 GitHub。
@@ -172,6 +174,8 @@ open myleaf.xcodeproj
 | 保存 | ⌘S |
 | 另存为 | ⌘⇧S |
 | 编译 | ⌘B |
+| 编辑器内查找 | ⌘F |
+| PDF 内查找 | ⌘⇧F |
 | 导出 PDF | ⌘E |
 | 导出 Word | ⌘⇧E |
 | 设置 | ⌘, |

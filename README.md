@@ -20,12 +20,14 @@ myleaf is a native macOS LaTeX editor built with SwiftUI, offering out-of-the-bo
 ### LaTeX Editor
 - **Syntax highlighting**: Color-coded tokens for comments, commands, environments, math mode, and braces with dark/light mode support
 - **Native editing experience**: NSTextView-based with undo/redo, auto-indent, monospaced font; undo history is capped at 100 levels to bound memory on large documents
+- **Find bar**: Cmd+F opens the native NSTextView find bar with incremental search, next/previous, match highlighting and replace
 - **Smart paste**: Automatically strips rich text formatting on paste, with instant syntax highlighting
 
 ### PDF Preview
 - **Live preview**: PDFKit-powered rendering, displayed immediately after compilation
 - **Split-pane layout**: Draggable divider between editor and PDF preview
 - **File-backed PDFs**: Compiled PDFs are cached in `~/Library/Caches/myleaf/pdfs` (max 3 files) and opened by URL, avoiding a full in-memory `Data` copy for large documents
+- **PDF search**: Cmd+Shift+F (or the toolbar magnifier) opens a find bar over the preview; all matches are highlighted, Return/chevrons cycle through them, with a match-case toggle
 
 ### LaTeX Compilation
 - **Multi-engine support**: Tectonic (preferred) with automatic fallback to pdflatex
@@ -79,9 +81,9 @@ Download the latest release from the [Releases](https://github.com/65zlui/myleaf
 
 | # | Mode | Package | Effect |
 |---|------|---------|--------|
-| 1 | **Full install** | `myleaf-0.1.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
-| 2 | **Full uninstall** | `myleaf-uninstaller-0.1.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
-| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-0.1.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
+| 1 | **Full install** | `myleaf-0.2.pkg`, or drag the app from the DMG/ZIP | Installs `/Applications/myleaf.app` |
+| 2 | **Full uninstall** | `myleaf-uninstaller-0.2.pkg` (DMG: `Uninstall myleaf.pkg`) | Removes the app **and** all per-user data |
+| 3 | **Uninstall, keep data** | `myleaf-uninstaller-keepdata-0.2.pkg` (DMG: `Uninstall myleaf (keep data).pkg`) | Removes only the app; settings, history, tools, and logs stay for the next install |
 
 > **Upgrades**: the `.pkg` installer quits myleaf and removes older `myleaf*.app` copies from `/Applications` and `~/Applications` before writing the new bundle, so versions never sit side by side. Settings → General → Installation lists any remaining copies (including Xcode build outputs) and warns when more than one is registered.
 
@@ -146,11 +148,11 @@ Select the `myleaf` scheme in Xcode, press Cmd+R to run, or choose Product > Arc
 
 Builds a universal (`arm64` + `x86_64`) binary, ad-hoc signs it with the hardened runtime, and writes:
 
-- `dist/myleaf-0.1.pkg` — installer (installs to `/Applications`)
-- `dist/myleaf-uninstaller-0.1.pkg` — full uninstall (app + data)
-- `dist/myleaf-uninstaller-keepdata-0.1.pkg` — uninstall the app, keep user data
-- `dist/myleaf-0.1.dmg` — drag-to-Applications image (includes both uninstallers)
-- `dist/myleaf-0.1.zip`
+- `dist/myleaf-0.2.pkg` — installer (installs to `/Applications`)
+- `dist/myleaf-uninstaller-0.2.pkg` — full uninstall (app + data)
+- `dist/myleaf-uninstaller-keepdata-0.2.pkg` — uninstall the app, keep user data
+- `dist/myleaf-0.2.dmg` — drag-to-Applications image (includes both uninstallers)
+- `dist/myleaf-0.2.zip`
 - `dist/SHA256SUMS.txt`
 
 Releases are also automated: push a `v*` tag and
@@ -171,6 +173,8 @@ publishes the GitHub Release (no local GitHub login required).
 | Save | Cmd+S |
 | Save As | Cmd+Shift+S |
 | Compile | Cmd+B |
+| Find in Editor | Cmd+F |
+| Find in PDF | Cmd+Shift+F |
 | Export PDF | Cmd+E |
 | Export Word | Cmd+Shift+E |
 | Settings | Cmd+, |
