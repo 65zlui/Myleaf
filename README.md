@@ -105,6 +105,12 @@ Upgrade with `brew upgrade --cask myleaf` (or Settings → General → Updates).
 Uninstall with `brew uninstall --cask myleaf`; add `--zap` to also remove user
 data, downloaded tools, logs, and caches.
 
+> If GitHub is slow or blocked, tap via SSH instead:
+> `brew tap 65zlui/myleaf git@github.com:65zlui/Myleaf.git`. Homebrew downloads
+> the DMG with `curl`; if release downloads time out, export `HTTPS_PROXY` /
+> `ALL_PROXY` for the install command (the in-app updater uses the system proxy
+> settings and may work without this).
+
 ### Paths
 
 | What | Path | Mode 2 (full) | Mode 3 (keep data) |

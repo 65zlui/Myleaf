@@ -107,6 +107,11 @@ cask 使用与 GitHub Release 相同的 DMG，并在安装后自动清除 quaran
 卸载：`brew uninstall --cask myleaf`；加 `--zap` 可同时清除用户数据、下载的工具、
 日志和缓存。
 
+> 如果 GitHub 访问慢或被阻断，可改用 SSH 添加 tap：
+> `brew tap 65zlui/myleaf git@github.com:65zlui/Myleaf.git`。Homebrew 用 `curl`
+> 下载 DMG；如果下载超时，请在安装命令前设置 `HTTPS_PROXY` / `ALL_PROXY`
+> （应用内更新走系统代理设置，可能不需要）。
+
 ### 各路径与处理方式
 
 | 内容 | 路径 | 方式 2（完整卸载） | 方式 3（保留数据） |
