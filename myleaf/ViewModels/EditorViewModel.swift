@@ -35,6 +35,8 @@ final class EditorViewModel {
 
     let installer = TectonicInstaller()
     let exportService = ExportService()
+    /// In-app update check against GitHub releases.
+    let updateChecker = UpdateChecker()
     /// Find state for the PDF preview pane.
     let pdfSearch = PDFSearchState()
     /// Incremented to ask the editor to show its find bar.

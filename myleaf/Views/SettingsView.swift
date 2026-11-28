@@ -243,6 +243,7 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 autoSaveSection
+                updatesSection
                 installationSection
             }
             .padding(16)
@@ -329,6 +330,125 @@ struct SettingsView: View {
         }
         .task {
             installedCopies = InstallationChecker.copies()
+        }
+    }
+
+    // MARK: - Updates
+
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Updates", systemImage: "arrow.triangle.2.circlepath")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    updateStatus
+                    Spacer(minLength: 8)
+                    updateActions
+                }
+
+                if case .available(let release) = viewModel.updateChecker.state {
+                    if !release.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(release.notes)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(5)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Link("Release notes on GitHub", destination: release.pageURL)
+                        .font(.caption)
+                }
+            }
+            .padding(12)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch viewModel.updateChecker.state {
+        case .idle:
+            Text("Check GitHub for a newer release.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        case .checking:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking for updates...")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        case .upToDate(let current):
+            Label("You're up to date (myleaf \(current)).", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(.green)
+        case .available(let release):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("myleaf \(release.version) is available")
+                    .font(.callout.bold())
+                Text("You have myleaf \(currentVersion).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .downloading(let version):
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Downloading myleaf \(version)...")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        case .installerOpened(let version):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Installer opened for myleaf \(version).")
+                    .font(.callout.bold())
+                Text("Complete the installation in the Installer window. myleaf will quit and can be reopened afterwards.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+    }
+
+    @ViewBuilder
+    private var updateActions: some View {
+        switch viewModel.updateChecker.state {
+        case .available(let release):
+            HStack(spacing: 8) {
+                Button("Check Again") { checkForUpdates() }
+                    .controlSize(.small)
+                Button("Download & Install") { installUpdate(release) }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+            }
+        case .checking, .downloading:
+            EmptyView()
+        default:
+            Button("Check for Updates") { checkForUpdates() }
+                .controlSize(.small)
+        }
+    }
+
+    private func checkForUpdates() {
+        let version = currentVersion
+        Task {
+            await viewModel.updateChecker.check(currentVersion: version)
+        }
+    }
+
+    private func installUpdate(_ release: UpdateRelease) {
+        let version = currentVersion
+        Task {
+            await viewModel.updateChecker.downloadAndOpenInstaller(
+                for: release,
+                currentVersion: version
+            )
         }
     }
 
