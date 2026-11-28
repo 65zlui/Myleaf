@@ -1,3 +1,47 @@
+# myleaf 0.2.0
+
+**Search + state fixes.** Adds find-in-editor and find-in-PDF, and repairs a
+set of UI state bugs around compilation, the welcome screen, IME input, and
+tool installation.
+
+## Highlights
+
+### Search
+- **Editor find bar (⌘F)** — native NSTextView find bar with incremental
+  search, next/previous, match highlighting, and replace.
+- **PDF search (⇧⌘F or the toolbar magnifier)** — a find bar over the preview
+  highlights every match, Return and the chevrons cycle through them, with a
+  match-case toggle and Esc to close. Recompiling re-runs an open search
+  against the new PDF.
+
+### Reliability
+- Switching documents during a compile no longer lets the stale build
+  overwrite the new document's PDF, error, or build log; superseded compiles
+  are discarded.
+- Cancelling the template picker from the welcome screen returns to the
+  welcome screen instead of opening an empty Untitled document.
+- Save / compile / export shortcuts are disabled while the welcome screen is
+  showing.
+- Per-document build state (log, spinner, compile token) is reset when the
+  document changes.
+
+### Editor
+- Syntax highlighting is skipped while an input method has marked text, fixing
+  dropped or duplicated characters during Chinese/Japanese composition.
+
+### Settings
+- Tool install progress is shown inside Settings, and Install is disabled while
+  a download is running.
+
+## Packages
+
+- `myleaf-0.2.pkg` — installer (recommended)
+- `myleaf-0.2.dmg` — drag-to-Applications image (includes uninstallers)
+- `myleaf-0.2.zip`
+- `myleaf-uninstaller-0.2.pkg` / `myleaf-uninstaller-keepdata-0.2.pkg`
+
+---
+
 # myleaf 0.1.0
 
 **First public release.** A native macOS LaTeX editor for academic writing,
